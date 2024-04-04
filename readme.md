@@ -94,7 +94,3 @@ these steps:
    created `.json` files.
    - Run the `import_to_notion.py` script. It will process all `.json` files in
    the directory and upload their contents to your Notion database.
-
-**Important Note**: The scripts do not check for the existence of a book entry
-in your Notion database before adding. Running the script multiple times with
-the same data will result in duplicates.
