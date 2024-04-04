@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 
@@ -11,7 +12,7 @@ def scrape_goodreads(goodreads_url):
     response = requests.get(goodreads_url)
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    print(goodreads_url)
+    print(f"Collecting data from the {goodreads_url}")
     title = soup.select_one('.Text__title1').get_text()
 
     author = soup.select_one('.ContributorLink__name').text.strip()
@@ -68,6 +69,9 @@ def scrape_wikipedia(wikipedia_url):
 
 def save_data_to_json(data, filename='data.json'):
     """Saves scraped data to a JSON file."""
+    if os.path.exists(filename):
+        print(f"File '{filename}' already exists. Skipping writing.")
+        return
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
@@ -89,16 +93,15 @@ def scrape_txt_file(input_file):
             url = line.strip()
             # Apply the scrape_url method to each URL
             data = scrape_url(url)
-
-        if data:
-            # Replace characters in title that are invalid for filenames
-            safe_title = "".join(
-                [c for c in data['title'] if c.isalpha() or c.isdigit() or c in " _-"]).rstrip()
-            filename = f"{safe_title}.json"
-            save_data_to_json(data, filename)
-            print(f"Data saved to {filename}")
-        else:
-            print("Failed to scrape data.")
+            if data:
+                # Replace characters in title that are invalid for filenames
+                safe_title = "".join(
+                    [c for c in data['title'] if c.isalpha() or c.isdigit() or c in " _-"]).rstrip()
+                filename = f"{safe_title}.json"
+                save_data_to_json(data, filename)
+                print(f"Data saved to {filename}")
+            else:
+                print("Failed to scrape data.")
 
 
 if __name__ == "__main__":
@@ -116,6 +119,8 @@ if __name__ == "__main__":
     data = None
 
     if url is not None:
+        print(f"Scrapping single URL")
         data = scrape_url(url)
     else:
+        print(f"Scrapping URLs from the {input_file} file")
         scrape_txt_file(input_file)
