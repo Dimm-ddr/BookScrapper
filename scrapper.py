@@ -93,15 +93,19 @@ def scrape_txt_file(input_file):
             url = line.strip()
             # Apply the scrape_url method to each URL
             data = scrape_url(url)
-            if data:
-                # Replace characters in title that are invalid for filenames
-                safe_title = "".join(
-                    [c for c in data['title'] if c.isalpha() or c.isdigit() or c in " _-"]).rstrip()
-                filename = f"{safe_title}.json"
-                save_data_to_json(data, filename)
-                print(f"Data saved to {filename}")
-            else:
-                print("Failed to scrape data.")
+            save_to_json_file(data)
+
+
+def save_to_json_file(data):
+    if data:
+        # Replace characters in title that are invalid for filenames
+        safe_title = "".join(
+            [c for c in data['title'] if c.isalpha() or c.isdigit() or c in " _-"]).rstrip()
+        filename = f"{safe_title}.json"
+        save_data_to_json(data, filename)
+        print(f"Data saved to {filename}")
+    else:
+        print("Failed to scrape data.")
 
 
 if __name__ == "__main__":
@@ -121,6 +125,7 @@ if __name__ == "__main__":
     if url is not None:
         print(f"Scrapping single URL")
         data = scrape_url(url)
+        save_to_json_file(data)
     else:
         print(f"Scrapping URLs from the {input_file} file")
         scrape_txt_file(input_file)
