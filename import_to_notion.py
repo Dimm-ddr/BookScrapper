@@ -84,6 +84,8 @@ def add_book_to_notion(data):
         },
     )
 
+    print(f"Added book from {json_file} to Notion")
+
 
 # List of your JSON files
 json_files = glob.glob("./*.json")
@@ -93,4 +95,3 @@ for json_file in json_files:
     with open(json_file, "r", encoding="utf-8") as f:
         book_data = json.load(f)
         add_book_to_notion(book_data)
-        print(f"Added book from {json_file} to Notion")
