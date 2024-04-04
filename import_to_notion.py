@@ -3,7 +3,7 @@ import json
 import os
 import time
 
-from notion_client import Client
+from notion_client import Client, APIResponseError
 
 # Initialize the Notion client with your integration token
 notion_secret = os.getenv("NOTION_SECRET")
@@ -28,14 +28,11 @@ def is_book_already_exist(title):
                 database_id=database_id, filter=query_filter
             )
 
-            if response.status_code == 429:
-                raise Exception("Rate limit exceeded")
-
             # Assuming the response is a dictionary that includes a 'results' key
             return len(response.get("results", [])) > 0
 
-        except Exception as e:
-            if str(e) == "Rate limit exceeded":
+        except APIResponseError as e:
+            if e.code.RateLimited:
                 print(
                     f"""Request rate limited. Retrying in 2 seconds...
                     Attempt {retries + 1}/{max_retries}"""
