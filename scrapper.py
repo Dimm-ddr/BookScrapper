@@ -72,21 +72,50 @@ def save_data_to_json(data, filename='data.json'):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
+def scrape_url(url):
+    if "goodreads.com" in url:
+        return scrape_goodreads(url)
+    else:
+        print("Unable to scrape from anything but goodreads at the moment. If you require "
+              "scrapping for another website, please create an issue, PR or fork the repo "
+              "at https://github.com/Dimm-ddr/BookScrapper")
+        sys.exit()
+
+
+def scrape_txt_file(input_file):
+    with open(input_file, 'r') as file:
+        for line in file:
+            # Strip newline and whitespace characters from the end of the line
+            url = line.strip()
+            # Apply the scrape_url method to each URL
+            data = scrape_url(url)
+
+        if data:
+            # Replace characters in title that are invalid for filenames
+            safe_title = "".join(
+                [c for c in data['title'] if c.isalpha() or c.isdigit() or c in " _-"]).rstrip()
+            filename = f"{safe_title}.json"
+            save_data_to_json(data, filename)
+            print(f"Data saved to {filename}")
+        else:
+            print("Failed to scrape data.")
+
+
 if __name__ == "__main__":
-    url = sys.argv[1]
+    argument = sys.argv[1]
+    url = None
+    input_file = None
+    if "https" in argument:
+        url = argument
+    elif ".txt" in argument:
+        input_file = argument
+    else:
+        print("Incorrect script parameter. "
+              "Pass either goodreads URL or text file with goodreads urls")
+        sys.exit()
     data = None
 
-    if "goodreads.com" in url:
-        data = scrape_goodreads(url)
-    elif "wikipedia.org" in url:
-        data = scrape_wikipedia(url)
-
-    if data:
-        # Replace characters in title that are invalid for filenames
-        safe_title = "".join(
-            [c for c in data['title'] if c.isalpha() or c.isdigit() or c in " _-"]).rstrip()
-        filename = f"{safe_title}.json"
-        save_data_to_json(data, filename)
-        print(f"Data saved to {filename}")
+    if url is not None:
+        data = scrape_url(url)
     else:
-        print("Failed to scrape data.")
+        scrape_txt_file(input_file)
