@@ -1,5 +1,5 @@
 /.venv
 *.json
 /.idea
-urls.txt
+*.txt
 set-env-vars*
