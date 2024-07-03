@@ -9,9 +9,11 @@ class BookData:
     link: str | None
     description: str | None
     cover: str | None
+    page_count: int | None
+    editions_count: int | None
+    isbn: str | None
     authors: list[str] = field(default_factory=list)
     languages: list[str] = field(default_factory=list)
-    isbn: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:

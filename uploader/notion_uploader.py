@@ -20,17 +20,19 @@ class NotionUploader:
             "Authors": {
                 "multi_select": [{"name": author} for author in book_data.authors]
             },
+            "Cover": {"url": book_data.cover},
+            "Tags": {"multi_select": [{"name": tag} for tag in book_data.tags]},
+            "Description": {
+                "rich_text": [{"text": {"content": book_data.description}}]
+            },
+            "Page Count": {"number": book_data.page_count},
+            "Link": {"url": book_data.link},
             "First Publish Year": {"number": book_data.first_publish_year},
             "Languages": {
                 "multi_select": [{"name": lang} for lang in book_data.languages]
             },
-            "ISBN": {"multi_select": [{"name": isbn} for isbn in book_data.isbn]},
-            "Tags": {"multi_select": [{"name": tag} for tag in book_data.tags]},
-            "Link": {"url": book_data.link},
-            "Description": {
-                "rich_text": [{"text": {"content": book_data.description}}]
-            },
-            "Cover": {"url": book_data.cover},
+            "ISBN": {"number": book_data.isbn},
+            "Editions count": {"number": book_data.editions_count},
         }
         self.notion.pages.create(
             parent={"database_id": self.database_id}, properties=properties
