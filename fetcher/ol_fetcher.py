@@ -24,7 +24,7 @@ def search_book_by_isbn(isbn: str, language: str) -> Any | None:
     return None
 
 
-def fetch_book_description(work_key: str) -> Any | Literal['']:
+def fetch_book_description(work_key: str) -> Any | Literal[""]:
     """Fetches the book description from Open Library using the work key."""
     url: str = f"https://openlibrary.org{work_key}.json"
     response: requests.Response = requests.get(url)

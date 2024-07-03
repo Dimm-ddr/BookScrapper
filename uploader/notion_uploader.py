@@ -15,6 +15,11 @@ class NotionUploader:
             self.upload_book_data(book_data)
 
     def upload_book_data(self, book_data: BookData) -> None:
+        # Check for Russian translation
+        russian_translation = (
+            "Might be available" if "ru" in book_data.languages else "Unknown"
+        )
+
         properties = {
             "Title": {"title": [{"text": {"content": book_data.title}}]},
             "Authors": {
@@ -33,6 +38,7 @@ class NotionUploader:
             },
             "ISBN": {"number": book_data.isbn},
             "Editions count": {"number": book_data.editions_count},
+            "Russian Translation": {"select": {"name": russian_translation}},
         }
         self.notion.pages.create(
             parent={"database_id": self.database_id}, properties=properties

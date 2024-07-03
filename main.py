@@ -46,7 +46,9 @@ def main() -> None:
         notion_secret: str | None = os.getenv("NOTION_SECRET")
         database_id: str | None = os.getenv("DATABASE_ID")
         if not notion_secret or not database_id:
-            print("Error: NOTION_SECRET and DATABASE_ID environment variables must be set")
+            print(
+                "Error: NOTION_SECRET and DATABASE_ID environment variables must be set"
+            )
             return
 
         uploader = NotionUploader(secret=notion_secret, database_id=database_id)

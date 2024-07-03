@@ -18,7 +18,9 @@ class DataFetcher:
         return self._combine_data(ol_data, gb_data)
 
     def _fetch_ol_data(self) -> dict | None:
-        url: str = f"https://openlibrary.org/api/books?bibkeys=ISBN:{self.isbn}&format=json&jscmd=data"
+        url: str = (
+            f"https://openlibrary.org/api/books?bibkeys=ISBN:{self.isbn}&format=json&jscmd=data"
+        )
         response: requests.Response = requests.get(url)
         if response.status_code == 200:
             data: dict = response.json()
@@ -52,9 +54,15 @@ class DataFetcher:
             authors = [author["name"] for author in ol_data.get("authors", [])]
             first_publish_year_str = ol_data.get("publish_date")
             first_publish_year = (
-                int(first_publish_year_str) if first_publish_year_str and first_publish_year_str.isdigit() else None
+                int(first_publish_year_str)
+                if first_publish_year_str and first_publish_year_str.isdigit()
+                else None
             )
-            languages = [lang.get("key") for lang in ol_data.get("languages", []) if lang.get("key")]
+            languages = [
+                lang.get("key")
+                for lang in ol_data.get("languages", [])
+                if lang.get("key")
+            ]
             tags = ol_data.get("subjects", [])
             link = ol_data.get("url")
             description = ol_data.get("description")
@@ -65,22 +73,36 @@ class DataFetcher:
         if gb_data:
             title = title or gb_data.get("volumeInfo", {}).get("title")
             authors = authors or gb_data.get("volumeInfo", {}).get("authors", [])
-            first_publish_year_str = first_publish_year_str or gb_data.get("volumeInfo", {}).get("publishedDate")
+            first_publish_year_str = first_publish_year_str or gb_data.get(
+                "volumeInfo", {}
+            ).get("publishedDate")
             first_publish_year = (
-                int(first_publish_year_str) if first_publish_year_str and first_publish_year_str.isdigit() else None
+                int(first_publish_year_str)
+                if first_publish_year_str and first_publish_year_str.isdigit()
+                else None
             )
             gb_languages = gb_data.get("volumeInfo", {}).get("language")
             if gb_languages and not languages:
-                languages = [gb_languages] if isinstance(gb_languages, str) else gb_languages
+                languages = (
+                    [gb_languages] if isinstance(gb_languages, str) else gb_languages
+                )
             tags = tags or gb_data.get("volumeInfo", {}).get("categories", [])
             link = link or gb_data.get("volumeInfo", {}).get("infoLink")
-            description = description or gb_data.get("volumeInfo", {}).get("description")
-            cover = cover or gb_data.get("volumeInfo", {}).get("imageLinks", {}).get("thumbnail")
+            description = description or gb_data.get("volumeInfo", {}).get(
+                "description"
+            )
+            cover = cover or gb_data.get("volumeInfo", {}).get("imageLinks", {}).get(
+                "thumbnail"
+            )
             page_count = page_count or gb_data.get("volumeInfo", {}).get("pageCount")
-            editions_count = editions_count or gb_data.get("volumeInfo", {}).get("editionsCount")
+            editions_count = editions_count or gb_data.get("volumeInfo", {}).get(
+                "editionsCount"
+            )
 
         if not title:
-            raise ValueError("Title is missing, cannot process the book without a title")
+            raise ValueError(
+                "Title is missing, cannot process the book without a title"
+            )
 
         return BookData(
             title=title,
