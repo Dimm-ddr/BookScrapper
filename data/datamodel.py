@@ -1,38 +1,42 @@
-"""
-Data model for book information in the Queer Books Data Pipeline.
-"""
-
 from dataclasses import asdict, dataclass, field
-from typing import Any, List, Optional
+from typing import Any
 import json
+
 
 @dataclass
 class BookData:
     """
     Represents book data with various attributes.
+
+    This dataclass encapsulates all relevant information about a book,
+    providing a structured way to store and manipulate book data.
     """
+
     title: str
-    first_publish_year: Optional[int]
-    link: Optional[str]
-    description: Optional[str]
-    cover: Optional[str]
-    page_count: Optional[int]
-    editions_count: Optional[int]
-    isbn: Optional[str]
-    authors: List[str] = field(default_factory=list)
-    languages: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    first_publish_year: int | None = None
+    link: str | None = None
+    description: str | None = None
+    cover: str | None = None
+    page_count: int | None = None
+    editions_count: int | None = None
+    isbn: str | None = None
+    authors: list[str] = field(default_factory=list)
+    languages: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """
         Validate data after initialization.
+
+        Raises:
+            ValueError: If any of the numeric fields have invalid values.
         """
         if self.first_publish_year is not None and self.first_publish_year < 0:
             raise ValueError("First publish year cannot be negative")
-        
+
         if self.page_count is not None and self.page_count <= 0:
             raise ValueError("Page count must be positive")
-        
+
         if self.editions_count is not None and self.editions_count < 0:
             raise ValueError("Editions count cannot be negative")
 
@@ -46,7 +50,7 @@ class BookData:
         return json.dumps(asdict(self), ensure_ascii=False, indent=4)
 
     @classmethod
-    def from_json(cls, json_str: str) -> 'BookData':
+    def from_json(cls, json_str: str) -> "BookData":
         """
         Create a BookData object from a JSON string.
 
