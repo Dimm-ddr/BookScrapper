@@ -3,3 +3,4 @@
 *.json
 *.txt
 .env
+**/__pycache__

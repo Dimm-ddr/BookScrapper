@@ -40,7 +40,7 @@ def process_isbn(isbn: str, retriever: Retriever) -> BookData | None:
 @click.command()
 @click.argument("isbn_file", type=click.Path(exists=True))
 @click.option("--output", default=None, help="Output JSON file for book data")
-def fetch_isbn(isbn_file: str, output: str | None) -> None:
+def fetch_isbn(isbn_file: str, output: str | None = None) -> None:
     """
     Fetch book data for ISBNs listed in a file.
 

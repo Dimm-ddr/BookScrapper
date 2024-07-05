@@ -1,3 +1,4 @@
+import os
 import requests
 from typing import Any
 from ..interface.data_source import DataSourceInterface
@@ -5,18 +6,15 @@ from ..interface.data_source import DataSourceInterface
 
 class GoogleBooksAPI(DataSourceInterface):
     BASE_URL = "https://www.googleapis.com/books/v1/volumes"
+    API_KEY: str | None = os.getenv("GOOGLE_BOOKS_API_KEY")
+
+    def __init__(self) -> None:
+        if not self.API_KEY:
+            raise ValueError("GOOGLE_BOOKS_API_KEY environment variable is not set")
 
     def fetch_by_isbn(self, isbn: str) -> dict[str, Any] | None:
-        """
-        Fetch book data from Google Books by ISBN.
-
-        Args:
-            isbn: The ISBN of the book to fetch.
-
-        Returns:
-            A dictionary containing book information, or None if not found.
-        """
-        response: requests.Response = requests.get(f"{self.BASE_URL}?q=isbn:{isbn}")
+        params: dict[str, Any] = {"q": f"isbn:{isbn}", "key": self.API_KEY}
+        response: requests.Response = requests.get(self.BASE_URL, params=params)
         if response.status_code == 200:
             items = response.json().get("items", [])
             if items:
@@ -24,18 +22,11 @@ class GoogleBooksAPI(DataSourceInterface):
         return None
 
     def fetch_by_title_author(self, title: str, author: str) -> dict[str, Any] | None:
-        """
-        Fetch book data from Google Books by title and author.
-
-        Args:
-            title: The title of the book to fetch.
-            author: The author of the book to fetch.
-
-        Returns:
-            A dictionary containing book information, or None if not found.
-        """
-        query: str = f"intitle:{title}+inauthor:{author}"
-        response: requests.Response = requests.get(f"{self.BASE_URL}?q={query}")
+        params: dict[str, Any] = {
+            "q": f"intitle:{title}+inauthor:{author}",
+            "key": self.API_KEY,
+        }
+        response: requests.Response = requests.get(self.BASE_URL, params=params)
         if response.status_code == 200:
             items = response.json().get("items", [])
             if items:
@@ -43,30 +34,54 @@ class GoogleBooksAPI(DataSourceInterface):
         return None
 
     def _parse_data(self, item: dict[str, Any]) -> dict[str, Any]:
-        """
-        Parse the raw data from Google Books into a standardized format.
-
-        Args:
-            item: The raw data from Google Books.
-
-        Returns:
-            A dictionary containing parsed book information.
-        """
         volume_info = item.get("volumeInfo", {})
-        return {
-            "title": volume_info.get("title"),
-            "authors": volume_info.get("authors", []),
-            "isbn": next(
+
+        # Extract ISBN-13 if available, otherwise use ISBN-10
+        isbn = next(
+            (
+                id["identifier"]
+                for id in volume_info.get("industryIdentifiers", [])
+                if id["type"] == "ISBN_13"
+            ),
+            None,
+        )
+        if not isbn:
+            isbn = next(
                 (
                     id["identifier"]
                     for id in volume_info.get("industryIdentifiers", [])
-                    if id["type"] == "ISBN_13"
+                    if id["type"] == "ISBN_10"
                 ),
                 None,
-            ),
-            "description": volume_info.get("description"),
+            )
+
+        # Enrich description with subtitle if available
+        description = volume_info.get("description", "")
+        subtitle = volume_info.get("subtitle")
+        if subtitle and subtitle not in description:
+            description = f"{subtitle}\n\n{description}".strip()
+
+        # Use categories as tags
+        tags = volume_info.get("categories", [])
+
+        # Extract year from publishedDate
+        publish_year = None
+        published_date = volume_info.get("publishedDate")
+        if published_date:
+            publish_year = int(published_date.split("-")[0])
+
+        return {
+            "title": volume_info.get("title"),
+            "first_publish_year": publish_year,
+            "link": volume_info.get("infoLink"),
+            "description": description,
             "cover": volume_info.get("imageLinks", {}).get("thumbnail"),
-            "publish_date": volume_info.get("publishedDate"),
-            "publisher": volume_info.get("publisher"),
             "page_count": volume_info.get("pageCount"),
+            "editions_count": None,  # Not available in Google Books API
+            "isbn": isbn,
+            "authors": volume_info.get("authors", []),
+            "languages": (
+                [volume_info.get("language")] if volume_info.get("language") else []
+            ),
+            "tags": tags,
         }

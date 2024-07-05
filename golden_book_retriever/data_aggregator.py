@@ -1,9 +1,15 @@
-from typing import Any, TypeGuard, Literal
+from dataclasses import fields
+import logging
+from typing import Any
+
+from data.datamodel import BookData
 
 from .interface.data_source import DataSourceInterface
 from .sources.openlibrary import OpenLibraryAPI
 from .sources.googlebooks import GoogleBooksAPI
 from .sources.goodreads import GoodreadsScraper
+
+logger = logging.getLogger(__name__)
 
 
 class DataAggregator:
@@ -29,27 +35,10 @@ class DataAggregator:
         title: str | None = None,
         author: str | None = None,
     ) -> dict[str, Any] | None:
-        """
-        Fetch book data from multiple sources based on provided identifiers.
-
-        This method attempts to fetch data from each source in order of priority,
-        stopping when complete data is found or all sources have been tried.
-
-        Args:
-            isbn: The ISBN of the book to fetch.
-            title: The title of the book to fetch.
-            author: The author of the book to fetch.
-
-        Returns:
-            A dictionary containing aggregated book information,
-            or None if no data is found.
-
-        Raises:
-            ValueError: If neither ISBN nor both title and author are provided.
-        """
         book_data: dict[str, Any] = {}
 
         for source in self.sources:
+            logger.debug(f"Trying to fetch data from {source.__class__.__name__}")
             if isbn is not None:
                 new_data: dict[str, Any] | None = source.fetch_by_isbn(isbn)
             elif title is not None and author is not None:
@@ -60,22 +49,19 @@ class DataAggregator:
                 )
 
             if new_data:
-                book_data |= new_data
+                logger.debug(f"Data fetched from {source.__class__.__name__}")
+                for key, value in new_data.items():
+                    if key not in book_data or not book_data[key]:
+                        book_data[key] = value
+
                 if self._is_data_complete(book_data):
+                    logger.debug("All fields filled, stopping further queries")
                     break
+            else:
+                logger.debug(f"No data found from {source.__class__.__name__}")
 
         return book_data or None
 
-    @staticmethod
-    def _is_data_complete(data: dict[str, Any]) -> bool:
-        """
-        Check if the collected book data is complete.
-
-        Args:
-            data: The book data to check.
-
-        Returns:
-            True if the data is complete, False otherwise.
-        """
-        required_fields: set[str] = {"title", "authors", "isbn", "description"}
-        return required_fields.issubset(data.keys())
+    def _is_data_complete(self, data: dict[str, Any]) -> bool:
+        expected_fields: set[str] = {field.name for field in fields(BookData)}
+        return all(data.get(field) for field in expected_fields)
