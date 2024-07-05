@@ -10,8 +10,8 @@ import os
 import logging
 from typing import List
 from data.datamodel import BookData
-from fetcher.data_fetcher import DataFetcher
-from fetcher.goodreads_scraper import GoodreadsScraper
+from golden_book_retriever.fetcher import DataFetcher
+from golden_book_retriever.sources.goodreads_scraper import GoodreadsScraper
 from agent_notion.uploader import NotionUploader
 
 logging.basicConfig(
