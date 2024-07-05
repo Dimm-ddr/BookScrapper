@@ -2,7 +2,7 @@ import argparse
 import os
 from data.datamodel import BookData
 from fetcher.data_fetcher import DataFetcher
-from scrapper.goodreads_scrapper import GoodreadsScraper
+from scraper.goodreads_scraper import GoodreadsScraper
 from uploader.notion_uploader import NotionUploader
 
 

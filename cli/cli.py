@@ -1,6 +1,6 @@
 import click
 from data.datamodel import BookData
-from scrapper.goodreads_scrapper import GoodreadsScraper
+from scraper.goodreads_scraper import GoodreadsScraper
 from fetcher.data_fetcher import DataFetcher
 from uploader.notion_uploader import NotionUploader
 
