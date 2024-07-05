@@ -2,7 +2,7 @@ import click
 from data.datamodel import BookData
 from scraper.goodreads_scraper import GoodreadsScraper
 from fetcher.data_fetcher import DataFetcher
-from uploader.notion_uploader import NotionUploader
+from agent_notion.uploader import NotionUploader
 
 
 @click.group()
