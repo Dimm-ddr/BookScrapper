@@ -34,12 +34,15 @@ class DataAggregator:
         isbn: str | None = None,
         title: str | None = None,
         author: str | None = None,
+        goodreads_data: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         book_data: dict[str, Any] = {}
 
         for source in self.sources:
             logger.debug(f"Trying to fetch data from {source.__class__.__name__}")
-            if isbn is not None:
+            if isinstance(source, GoodreadsScraper) and goodreads_data:
+                new_data = goodreads_data
+            elif isbn is not None:
                 new_data: dict[str, Any] | None = source.fetch_by_isbn(isbn)
             elif title is not None and author is not None:
                 new_data = source.fetch_by_title_author(title, author)
