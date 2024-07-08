@@ -4,10 +4,10 @@ This project is designed to create and manage a database of queer books, with a 
 
 ## Features
 
-1. **Data Scraping:** Extracts book information from Goodreads.
-2. **Data Fetching:** Fetches book information from Open Library and Google Books APIs.
+1. **Data Retrieval:** Fetches book information from Open Library, Google Books APIs, and Goodreads.
+2. **Data Processing:** Processes and standardizes book data from various sources.
 3. **Data Uploading:** Uploads processed data to a Notion database.
-4. **Command Line Interface (CLI):** Provides an easy way to run the different components of the project.
+4. **Command Line Interface (CLI):** Provides an easy way to run different components of the project.
 
 ## Prerequisites
 
@@ -37,97 +37,95 @@ This project is designed to create and manage a database of queer books, with a 
    pip install -r requirements.txt
    ```
 
-4. Create a Notion Integration:
-   - Navigate to [My Integrations](https://www.notion.so/my-integrations) on Notion.
-   - Click the **"+ New integration"** button.
-   - Fill out the form with your integration's name and associate it with your
-   workspace.
-   - Note the **"Internal Integration Token"** provided after creation for later
-   use.
-5. Share Your Database with the Integration:
-   - Open the Notion database you want to integrate with.
-   - Click the **"Share"** button on the top right.
-   - Choose the integration you created and share the database with it.
-6. Find Your Database ID:
-   - Open your database as a page, the URL will look like:
-   `https://www.notion.so/{workspace}/{database_id}?v={view_id}`
-   - The Database ID is the part between the last `/` and `?v=`.
-7. Set up environment variables for Notion API:
+4. Set up environment variables:
+   Create a `.env` file in the project root and add the following:
 
-   ```bash
-   export NOTION_SECRET='your-notion-secret'
-   export DATABASE_ID='your-database-id'
+   ``` env
+   NOTION_SECRET=your_notion_secret_key
+   DATABASE_ID=your_notion_database_id
    ```
 
-   > **⚠️ Warning**:Remember to never share your Internal Integration Token publicly to maintain the
-security of your Notion integration.
+   Replace `your_notion_secret_key` and `your_notion_database_id` with your actual Notion API secret and database ID.
 
-## Setting Up Your Notion Database for Book Metadata Import
+## Setting Up Your Notion Database
 
-To utilize the provided scripts for uploading book metadata into your Notion database, ensure your database is set up with the following properties:
+Ensure your Notion database has the following properties:
 
 - **Title** (Title type): For the book title.
 - **Authors** (Multi-select type): For the book's authors.
 - **Cover** (Files & media type): To store a link to the book's cover image.
-- **Tags** (Multi-select type): For various tags associated with the book, like genre.
+- **Tags** (Multi-select type): For various tags associated with the book.
 - **Description** (Text type): For a brief description or synopsis of the book.
-- **Page count** (number): Book page count.
+- **Page count** (Number type): Book page count.
 - **Link** (URL type): For a link to more information about the book.
 - **First Publish Year** (Number type): For the year the book was first published.
 - **Languages** (Multi-select type): For the languages the book is available in.
 - **ISBN** (Text type): For the book's ISBN numbers.
-- **Editions count** (number): Number of known editions.
+- **Editions count** (Number type): Number of known editions.
 
 ## Usage
 
-### Command Line Interface
+The project provides a command-line interface with various options:
 
-You can use the provided CLI to run different components of the project.
+```bash
+python main.py [OPTIONS]
+```
 
-1. **Fetch book data by ISBN:**
+### Options
+
+- `--isbn ISBN`: Fetch book data by ISBN
+- `--title TITLE`: Book title for fetching data
+- `--author AUTHOR`: Book author for fetching data
+- `--isbn-file FILE`: File containing a list of ISBNs
+- `--goodreads-file FILE`: File containing a list of Goodreads URLs
+- `--upload`: Upload books to Notion
+- `--no-debug`: Disable debug logging
+
+### Examples
+
+1. Fetch data for a single ISBN:
 
    ```bash
-   python main.py --isbn --input isbn.txt --output output.json
+   python main.py --isbn 9781234567890
    ```
 
-2. **Scrape book data from Goodreads URL:**
+2. Fetch data by title and author:
 
    ```bash
-   python main.py --url --input goodreads_url.txt --output output.json
+   python main.py --title "Book Title" --author "Author Name"
    ```
 
-3. **Upload data to Notion:**
+3. Process ISBNs from a file:
 
    ```bash
-   python main.py --upload --output output.json
+   python main.py --isbn-file path/to/isbn_list.txt
    ```
 
-### Fetching Data
+4. Process Goodreads URLs from a file:
 
-1. **Fetching by ISBN:**
-   - Create a text file (`isbn.txt`) with one ISBN per line.
-   - Run the following command to fetch data for each ISBN and save it to `output.json`:
+   ```bash
+   python main.py --goodreads-file path/to/goodreads_urls.txt
+   ```
 
-     ```bash
-     python main.py --isbn --input isbn.txt --output output.json
-     ```
+5. Upload processed books to Notion:
 
-2. **Scraping from Goodreads:**
-   - Create a text file (`goodreads_url.txt`) with one Goodreads book URL per line.
-   - Run the following command to scrape data from each URL and save it to `output.json`:
+   ```bash
+   python main.py --upload
+   ```
 
-     ```bash
-     python main.py --url --input goodreads_url.txt --output output.json
-     ```
+6. Run with debug logging disabled:
 
-### Uploading Data
+   ```bash
+   python main.py --isbn 9781234567890 --no-debug
+   ```
 
-- Ensure `output.json` contains the data you want to upload.
-- Run the following command to upload the data to Notion:
+## Data Storage
 
-  ```bash
-  python main.py --upload --output output.json
-  ```
+Processed book data is stored in JSON format in the `data/books` directory. Each book is saved in a separate file named after its title.
+
+## Error Handling
+
+Errors during processing are logged in `error_log.txt` in the project root directory.
 
 ## Contributing
 
