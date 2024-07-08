@@ -145,7 +145,9 @@ def main() -> None:
 
             case argparse.Namespace(title=str(title), author=str(author)):
                 logger.debug(f"Fetching data for title: {title!r}, author: {author!r}")
-                book_data: dict[str, Any] | None = retriever.fetch_by_title_author(title, author)
+                book_data: dict[str, Any] | None = retriever.fetch_by_title_author(
+                    title, author
+                )
                 process_book_data(book_data, f"{title!r} by {author!r}")
 
             case _:

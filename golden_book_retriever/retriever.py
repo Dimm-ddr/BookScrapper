@@ -17,10 +17,14 @@ class Retriever:
         self.goodreads_cache: dict[str, Any] | None = None
 
     def fetch_by_isbn(self, isbn: str) -> dict[str, Any] | None:
-        return self.aggregator.fetch_data(isbn=isbn, goodreads_data=self.goodreads_cache)
+        return self.aggregator.fetch_data(
+            isbn=isbn, goodreads_data=self.goodreads_cache
+        )
 
     def fetch_by_title_author(self, title: str, author: str) -> dict[str, Any] | None:
-        return self.aggregator.fetch_data(title=title, author=author, goodreads_data=self.goodreads_cache)
+        return self.aggregator.fetch_data(
+            title=title, author=author, goodreads_data=self.goodreads_cache
+        )
 
     def fetch_by_goodreads_url(self, url: str) -> dict[str, Any] | None:
         logger.debug(f"Fetching data from Goodreads URL: {url}")
@@ -38,7 +42,7 @@ class Retriever:
             logger.debug(f"ISBN found: {isbn}. Fetching data from all sources.")
             combined_data: dict[str, Any] | None = self.fetch_by_isbn(isbn)
         elif title and author:
-            logger.debug(f"Title and author found. Fetching data from all sources.")
+            logger.debug("Title and author found. Fetching data from all sources.")
             combined_data = self.fetch_by_title_author(title, author)
         else:
             logger.warning(
@@ -54,11 +58,14 @@ class Retriever:
 
             # Merge tags and authors
             combined_data["tags"] = list(
-                set(combined_data.get("tags", []) + self.goodreads_cache.get("tags", []))
+                set(
+                    combined_data.get("tags", []) + self.goodreads_cache.get("tags", [])
+                )
             )
             combined_data["authors"] = list(
                 set(
-                    combined_data.get("authors", []) + self.goodreads_cache.get("authors", [])
+                    combined_data.get("authors", [])
+                    + self.goodreads_cache.get("authors", [])
                 )
             )
 
