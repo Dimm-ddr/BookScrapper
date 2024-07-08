@@ -1,5 +1,7 @@
 /.venv
-*.json
 /.idea
+*.json
 *.txt
-set-env-vars*
+.env
+**/__pycache__
+*.log
