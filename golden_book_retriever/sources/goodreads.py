@@ -145,6 +145,6 @@ class GoodreadsScraper(DataSourceInterface):
         except json.JSONDecodeError:
             # Log this error if you have logging set up
             return None
-        except AttributeError:
+        except AttributeError as ae:
             # This should never happen due to the _is_valid_script_tag check, but just in case:
-            raise ValueError("Unexpected script tag content in Goodreads page")
+            raise ValueError("Unexpected script tag content in Goodreads page") from ae
