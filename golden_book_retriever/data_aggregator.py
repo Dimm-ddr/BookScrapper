@@ -9,7 +9,7 @@ from .sources.openlibrary import OpenLibraryAPI
 from .sources.googlebooks import GoogleBooksAPI
 from .sources.goodreads import GoodreadsScraper
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class DataAggregator:
@@ -37,11 +37,13 @@ class DataAggregator:
         goodreads_data: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         book_data: dict[str, Any] = {}
+        goodreads_cover: str | None = None
 
         for source in self.sources:
             logger.debug(f"Trying to fetch data from {source.__class__.__name__}")
             if isinstance(source, GoodreadsScraper) and goodreads_data:
                 new_data = goodreads_data
+                goodreads_cover = new_data.get("cover")
             elif isbn is not None:
                 new_data: dict[str, Any] | None = source.fetch_by_isbn(isbn)
             elif title is not None and author is not None:
@@ -55,13 +57,20 @@ class DataAggregator:
                 logger.debug(f"Data fetched from {source.__class__.__name__}")
                 for key, value in new_data.items():
                     if key not in book_data or not book_data[key]:
-                        book_data[key] = value
+                        if key != "cover" or (
+                            key == "cover" and isinstance(source, GoodreadsScraper)
+                        ):
+                            book_data[key] = value
 
                 if self._is_data_complete(book_data):
                     logger.debug("All fields filled, stopping further queries")
                     break
             else:
                 logger.debug(f"No data found from {source.__class__.__name__}")
+
+        # Use Goodreads cover if available
+        if goodreads_cover:
+            book_data["cover"] = goodreads_cover
 
         return book_data or None
 
