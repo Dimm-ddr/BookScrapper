@@ -84,4 +84,6 @@ class GoogleBooksAPI(DataSourceInterface):
                 [volume_info.get("language")] if volume_info.get("language") else []
             ),
             "tags": tags,
+            "publisher": volume_info.get("publisher"),
+            "series": None,  # Google Books API doesn't provide series information
         }

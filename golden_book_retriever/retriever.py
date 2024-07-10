@@ -5,7 +5,7 @@ from .sources.googlebooks import GoogleBooksAPI
 from .sources.goodreads import GoodreadsScraper
 import logging
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class Retriever:

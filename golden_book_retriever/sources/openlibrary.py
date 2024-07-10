@@ -75,6 +75,10 @@ class OpenLibraryAPI(DataSourceInterface):
         # Use the median number of pages if available
         page_count = data.get("number_of_pages_median")
 
+        publisher = data.get("publisher", [])
+        if publisher and isinstance(publisher, list):
+            publisher = publisher[0]
+
         return {
             "title": title,
             "first_publish_year": data.get("first_publish_year"),
@@ -97,4 +101,7 @@ class OpenLibraryAPI(DataSourceInterface):
             "authors": authors,
             "languages": data.get("language", []),
             "tags": tags,
+            "publisher": publisher,
+            # OpenLibrary doesn't provide series information
+            "series": None,
         }
