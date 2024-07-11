@@ -1,6 +1,7 @@
 import click
 import logging
 from typing import Any, List
+from cloning_machine.cloner import NotionCloner
 from data.datamodel import BookData
 from golden_book_retriever.retriever import Retriever
 
@@ -94,6 +95,21 @@ def fetch_by_title_author(title: str, author: str, output: str | None) -> None:
             logging.warning(f"No data found for {title!r} by {author!r}")
     except Exception as e:
         logging.error(f"Error in fetch_by_title_author: {str(e)!r}")
+
+
+@click.command()
+def clone_staging() -> None:
+    """Clone the live Notion page to a staging area."""
+    cloner = NotionCloner()
+    try:
+        cloner.cleanup_staging()
+        new_staging_id: str = cloner.clone_page()
+        click.echo(f"Created new staging clone with ID: {new_staging_id}")
+    except Exception as e:
+        click.echo(f"Error creating staging clone: {str(e)}", err=True)
+
+
+cli.add_command(clone_staging)
 
 
 cli.add_command(fetch_isbn)

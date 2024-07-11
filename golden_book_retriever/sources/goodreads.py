@@ -31,53 +31,64 @@ class GoodreadsScraper(DataSourceInterface):
         if response.status_code != 200:
             return None
 
-        soup = BeautifulSoup(response.text, 'html.parser')
-        script_tag = soup.find('script', id='__NEXT_DATA__')
+        soup = BeautifulSoup(response.text, "html.parser")
+        script_tag = soup.find("script", id="__NEXT_DATA__")
 
         if not script_tag:
             self._save_response_and_exit(response)
         elif not is_valid_script_tag(script_tag):
-            logger.error('Script tag is not valid.')
+            logger.error("Script tag is not valid.")
             self._save_response_and_exit(response)
 
         try:
-            json_data = json.loads(script_tag.string) # type: ignore
+            json_data = json.loads(script_tag.string)  # type: ignore
         except json.JSONDecodeError:
             self._save_response_and_exit(response)
 
-        apollo_state = json_data['props']['pageProps']['apolloState']
+        apollo_state = json_data["props"]["pageProps"]["apolloState"]
 
         # Find book data
-        book_key = next((key for key in apollo_state.keys() if key.startswith('Book:')), None)
+        book_key = next(
+            (key for key in apollo_state.keys() if key.startswith("Book:")), None
+        )
         if not book_key:
-            logger.error('No book data found in the response.')
+            logger.error("No book data found in the response.")
             self._save_response_and_exit(response)
 
         book_data = apollo_state[book_key]
 
         # Find series data
-        series_key = next((key for key in apollo_state.keys() if key.startswith('Series:')), None)
+        series_key = next(
+            (key for key in apollo_state.keys() if key.startswith("Series:")), None
+        )
         series_data = apollo_state.get(series_key) if series_key else None
 
         # Extract relevant information
         result: dict[str, Any] = {
-            "title": book_data.get('title'),
-            "authors": [book_data['primaryContributorEdge']['node']['name']] if book_data.get('primaryContributorEdge') else [],
-            "cover": book_data.get('imageUrl'),
-            "description": book_data.get('description'),
-            "tags": [genre['genre']['name'] for genre in book_data.get('bookGenres', [])],
-            "page_count": book_data.get('details', {}).get('numPages'),
+            "title": book_data.get("title"),
+            "authors": (
+                [book_data["primaryContributorEdge"]["node"]["name"]]
+                if book_data.get("primaryContributorEdge")
+                else []
+            ),
+            "cover": book_data.get("imageUrl"),
+            "description": book_data.get("description"),
+            "tags": [
+                genre["genre"]["name"] for genre in book_data.get("bookGenres", [])
+            ],
+            "page_count": book_data.get("details", {}).get("numPages"),
             "link": url,
-            "isbn": book_data.get('details', {}).get('isbn13') or book_data.get('details', {}).get('isbn'),
-            "language": book_data.get('details', {}).get('language', {}).get('name'),
-            "publish_date": book_data.get('details', {}).get('publicationTime'),
-            "publisher": book_data.get('details', {}).get('publisher'),
-            "series": None  # Default to None
+            "isbn": book_data.get("details", {}).get("isbn13")
+            or book_data.get("details", {}).get("isbn"),
+            "language": book_data.get("details", {}).get("language", {}).get("name"),
+            "publish_date": book_data.get("details", {}).get("publicationTime"),
+            "publisher": book_data.get("details", {}).get("publisher"),
+            "series": None,  # Default to None
         }
 
         # Add series information if available
         if series_data:
-            result["series"] = series_data.get('title')
+            result["series"] = series_data.get("title")
 
         return result
 

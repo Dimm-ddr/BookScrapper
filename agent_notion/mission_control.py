@@ -35,7 +35,7 @@ class MissionControl:
         Initialize MissionControl with Notion client and database ID.
         """
         self.notion = Client(auth=os.environ["NOTION_SECRET"])
-        self.database_id: str = os.environ["DATABASE_ID"]
+        self.DATABASE_ID: str = os.environ["DATABASE_ID"]
 
     def _is_dict_response(self, obj: Any) -> TypeGuard[dict[str, Any]]:
         """
@@ -69,13 +69,15 @@ class MissionControl:
                     "title": {"equals": title},
                 }
                 response = self.notion.databases.query(
-                    database_id=self.database_id, filter=query_filter
+                    database_id=self.DATABASE_ID, filter=query_filter
                 )
 
                 if self._is_dict_response(response):
                     return len(response.get("results", [])) > 0
                 else:
-                    raise TypeError("Unexpected response type from Notion API")
+                    raise TypeError(
+                        f"Unexpected response type from Notion API: {response!r}"
+                    )
 
             except APIResponseError as e:
                 if e.code == "rate_limited":
@@ -115,7 +117,7 @@ class MissionControl:
             properties: dict[str, Any] = prepare_book_intel(book_data)
 
             new_page: Any | Awaitable[Any] = self.notion.pages.create(
-                parent={"database_id": self.database_id}, properties=properties
+                parent={"DATABASE_ID": self.DATABASE_ID}, properties=properties
             )
 
             if self._is_dict_response(new_page):

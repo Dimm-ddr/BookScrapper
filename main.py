@@ -6,6 +6,7 @@ import argparse
 import logging
 from typing import Any, Callable, LiteralString
 from agent_notion.uploader import upload_books_to_notion
+from cloning_machine.cloner import NotionCloner
 from golden_book_retriever.retriever import Retriever
 
 # Load environment variables from .env file
@@ -101,6 +102,18 @@ def process_goodreads_url(url: str, retriever: Retriever) -> None:
         logger.warning(f"No data found for Goodreads URL: {url}")
 
 
+def clone_staging() -> None:
+    """Clone the live Notion page to a staging area."""
+    cloner = NotionCloner()
+    try:
+        cloner.cleanup_staging()
+        new_staging_id: str = cloner.clone_page()
+        logger.info(f"Created new staging clone with ID: {new_staging_id}")
+    except Exception as e:
+        logger.error(f"Error creating staging clone: {str(e)}")
+        sys.exit(1)
+
+
 def main() -> None:
     """
     Main function to run the Golden Book Retriever.
@@ -118,6 +131,11 @@ def main() -> None:
     )
     parser.add_argument("--upload", action="store_true", help="Upload books to Notion")
     parser.add_argument("--no-debug", action="store_true", help="Disable debug logging")
+    parser.add_argument(
+        "--clone-staging",
+        action="store_true",
+        help="Clone the live Notion page to a staging area",
+    )
 
     args: argparse.Namespace = parser.parse_args()
 
@@ -149,6 +167,9 @@ def main() -> None:
                     title, author
                 )
                 process_book_data(book_data, f"{title!r} by {author!r}")
+
+            case argparse.Namespace(clone_staging=True):
+                clone_staging()
 
             case _:
                 logger.error("Invalid arguments. Use --help for usage information.")

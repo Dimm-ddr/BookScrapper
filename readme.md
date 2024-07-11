@@ -42,7 +42,7 @@ This project is designed to create and manage a database of queer books, with a 
 
    ``` env
    NOTION_SECRET=your_notion_secret_key
-   DATABASE_ID=your_notion_database_id
+   Database_ID=your_notion_database_id
    ```
 
    Replace `your_notion_secret_key` and `your_notion_database_id` with your actual Notion API secret and database ID.
