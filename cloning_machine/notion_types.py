@@ -1,4 +1,5 @@
-from typing import Any, TypedDict, TypeGuard, NotRequired, Union
+from typing import Any, TypedDict, TypeGuard, NotRequired
+from .notion_constants import NotionBlockType
 
 
 class BlockContent(TypedDict, total=False):
@@ -9,43 +10,14 @@ class BlockContent(TypedDict, total=False):
     children: list[Any]
     title: list[dict[str, Any]]
     properties: dict[str, Any]
-    id: str  # For database ID
+    id: str
 
 
 class NotionBlock(TypedDict):
     id: str
-    type: str
+    type: NotionBlockType
     has_children: NotRequired[bool]
-    paragraph: NotRequired[BlockContent]
-    heading_1: NotRequired[BlockContent]
-    heading_2: NotRequired[BlockContent]
-    heading_3: NotRequired[BlockContent]
-    bulleted_list_item: NotRequired[BlockContent]
-    numbered_list_item: NotRequired[BlockContent]
-    to_do: NotRequired[BlockContent]
-    toggle: NotRequired[BlockContent]
-    child_page: NotRequired[BlockContent]
-    child_database: NotRequired[BlockContent]
-    embed: NotRequired[BlockContent]
-    image: NotRequired[BlockContent]
-    video: NotRequired[BlockContent]
-    file: NotRequired[BlockContent]
-    pdf: NotRequired[BlockContent]
-    bookmark: NotRequired[BlockContent]
-    callout: NotRequired[BlockContent]
-    quote: NotRequired[BlockContent]
-    equation: NotRequired[BlockContent]
-    divider: NotRequired[BlockContent]
-    table_of_contents: NotRequired[BlockContent]
-    column: NotRequired[BlockContent]
-    column_list: NotRequired[BlockContent]
-    link_preview: NotRequired[BlockContent]
-    synced_block: NotRequired[BlockContent]
-    template: NotRequired[BlockContent]
-    link_to_page: NotRequired[BlockContent]
-    table: NotRequired[BlockContent]
-    table_row: NotRequired[BlockContent]
-    code: NotRequired[BlockContent]
+    content: dict[NotionBlockType, BlockContent]
 
 
 class NotionPage(TypedDict):
@@ -87,4 +59,12 @@ def is_notion_database_page(obj: Any) -> TypeGuard[NotionDatabasePage]:
 
 
 def is_notion_block(obj: Any) -> TypeGuard[NotionBlock]:
-    return isinstance(obj, dict) and "id" in obj and "type" in obj
+    return (
+        isinstance(obj, dict)
+        and "id" in obj
+        and "type" in obj
+        and isinstance(obj["type"], NotionBlockType)
+        and "content" in obj
+        and isinstance(obj["content"], dict)
+        and all(isinstance(k, NotionBlockType) for k in obj["content"])
+    )

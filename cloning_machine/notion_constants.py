@@ -1,0 +1,37 @@
+from enum import Enum, auto
+
+
+class NotionBlockType(Enum):
+    PARAGRAPH = auto()
+    HEADING_1 = auto()
+    HEADING_2 = auto()
+    HEADING_3 = auto()
+    BULLETED_LIST_ITEM = auto()
+    NUMBERED_LIST_ITEM = auto()
+    TO_DO = auto()
+    TOGGLE = auto()
+    CHILD_PAGE = auto()
+    CHILD_DATABASE = auto()
+    EMBED = auto()
+    IMAGE = auto()
+    VIDEO = auto()
+    FILE = auto()
+    PDF = auto()
+    BOOKMARK = auto()
+    CALLOUT = auto()
+    QUOTE = auto()
+    EQUATION = auto()
+    DIVIDER = auto()
+    TABLE_OF_CONTENTS = auto()
+    COLUMN = auto()
+    COLUMN_LIST = auto()
+    LINK_PREVIEW = auto()
+    SYNCED_BLOCK = auto()
+    TEMPLATE = auto()
+    LINK_TO_PAGE = auto()
+    TABLE = auto()
+    TABLE_ROW = auto()
+    CODE = auto()
+
+
+NOTION_BLOCK_TYPES = set(NotionBlockType)

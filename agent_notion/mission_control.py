@@ -6,6 +6,8 @@ from typing import Any, Awaitable, TypeGuard, List
 from notion_client import APIResponseError, Client
 import logging
 import re
+
+from exceptions import NotionResponseTypeError
 from .field_operative import prepare_book_intel
 
 # Set up package-specific logger
@@ -75,9 +77,7 @@ class MissionControl:
                 if self._is_dict_response(response):
                     return len(response.get("results", [])) > 0
                 else:
-                    raise TypeError(
-                        f"Unexpected response type from Notion API: {response!r}"
-                    )
+                    raise NotionResponseTypeError(response)
 
             except APIResponseError as e:
                 if e.code == "rate_limited":
@@ -125,9 +125,7 @@ class MissionControl:
                     new_page["id"], book_data.get("description", "")
                 )
             else:
-                raise TypeError(
-                    "Unexpected response type from Notion API when creating page"
-                )
+                raise NotionResponseTypeError(new_page, extra_data="when creating page")
         except Exception as e:
             logger.error(
                 f"Error uploading book {book_data.get('title', 'Unknown')!r}: {str(e)!r}",
