@@ -133,3 +133,10 @@ class NotionOperations:
                 }
 
         return formatted_properties
+
+    def get_database(self, database_id: str) -> NotionDatabase:
+        """Retrieve a database from Notion."""
+        response = self.client.databases.retrieve(database_id)
+        if not is_notion_database(response):
+            raise NotionResponseTypeError(response)
+        return response

@@ -28,25 +28,36 @@ class NotionCloner:
 
     def clone_page(self) -> str:
         try:
-            # First, clean the target page
+            logger.info("Starting clone_page operation")
+
+            logger.info("Cleaning target page")
             self._clean_target_page()
 
+            logger.info(f"Fetching live page with ID: {self.live_page_id}")
             live_page: NotionPage = self.notion_ops.get_page(self.live_page_id)
+
+            logger.info(f"Creating new page under parent ID: {self.staging_parent_id}")
             new_page: NotionPage = self.notion_ops.create_page(
                 self.staging_parent_id, live_page["properties"]
             )
             logger.info(f"Created new page with ID: {new_page['id']}")
 
+            logger.info(
+                f"Cloning page content from {self.live_page_id} to {new_page['id']}"
+            )
             self._clone_page_content(self.live_page_id, new_page["id"])
             logger.info("Cloned page content")
 
+            logger.info(
+                f"Cloning database contents from {self.database_id} to {new_page['id']}"
+            )
             self._clone_database_contents(self.database_id, new_page["id"])
-            logger.info("Cloned database")
+            logger.info("Cloned database contents")
 
             logger.info(f"Successfully cloned live page to staging: {new_page['id']}")
             return new_page["id"]
         except Exception as e:
-            logger.error(f"Error in clone_page: {str(e)}")
+            logger.error(f"Error in clone_page: {str(e)}", exc_info=True)
             raise NotionOperationError(f"Failed to clone page: {str(e)}") from e
 
     def _clean_target_page(self) -> None:
@@ -135,27 +146,50 @@ class NotionCloner:
             logger.debug(f"Database content: {database_content}")
             raise
 
-    def _clone_database_contents(self, source_db_id: str, target_db_id: str) -> None:
-        start_cursor = None
-        while True:
-            response: NotionListResponse = self.notion_ops.query_database(
-                source_db_id, start_cursor
-            )
+    def _clone_database_contents(self, source_db_id: str, target_page_id: str) -> None:
+        logger.info(
+            f"Starting _clone_database_contents from {source_db_id} to {target_page_id}"
+        )
+        try:
+            logger.info(f"Querying source database: {source_db_id}")
+            response: NotionListResponse = self.notion_ops.query_database(source_db_id)
+
+            logger.info(f"Creating new database in target page: {target_page_id}")
+            # Here, you need to implement the logic to create a new database
+            # in the target page and get its ID
+            new_db_id: str = self._create_new_database(target_page_id, source_db_id)
+
+            logger.info(f"Cloning database entries to new database: {new_db_id}")
             for page in response["results"]:
                 if not is_notion_database_page(page):
-                    raise ValueError("Invalid page structure in database response")
+                    logger.warning(
+                        f"Invalid page structure in database response: {page['id']}"
+                    )
+                    continue
                 new_page: NotionPage = self.notion_ops.create_page(
-                    target_db_id, page["properties"]
+                    new_db_id, page["properties"]
                 )
                 self._clone_page_content(page["id"], new_page["id"])
-            if not response["has_more"]:
-                break
-            start_cursor: str | None = response.get("next_cursor")
-            if start_cursor is None:
-                logger.warning(
-                    "Expected next_cursor but received None. Stopping pagination."
-                )
-                break
+
+            logger.info("Finished cloning database contents")
+        except Exception as e:
+            logger.error(f"Error in _clone_database_contents: {str(e)}", exc_info=True)
+            raise
+
+    def _create_new_database(self, target_page_id: str, source_db_id: str) -> str:
+        logger.info(
+            f"Creating new database based on {source_db_id} in page {target_page_id}"
+        )
+        try:
+            source_db: NotionDatabase = self.notion_ops.get_database(source_db_id)
+            new_db: NotionDatabase = self.notion_ops.create_database(
+                target_page_id, source_db["title"], source_db["properties"]
+            )
+            logger.info(f"Created new database with ID: {new_db['id']}")
+            return new_db["id"]
+        except Exception as e:
+            logger.error(f"Error in _create_new_database: {str(e)}", exc_info=True)
+            raise
 
     def cleanup_staging(self) -> None:
         try:
