@@ -5,7 +5,7 @@ from pathlib import Path
 import logging
 from .mission_control import MissionControl
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def upload_books_to_notion(books_dir: str) -> None:

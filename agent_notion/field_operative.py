@@ -265,4 +265,11 @@ def prepare_book_intel(book_data: dict[str, Any]) -> dict[str, Any]:
                 "name": "Есть" if "Русский" in standardized_languages else "Неизвестно"
             }
         },
+        "Издатель": {
+            "multi_select": [
+                {"name": publisher}
+                for publisher in book_data.get("publishers", [])
+                if publisher
+            ]
+        },
     }

@@ -70,6 +70,9 @@ class GoogleBooksAPI(DataSourceInterface):
         if published_date:
             publish_year = int(published_date.split("-")[0])
 
+        publisher = volume_info.get("publisher")
+        publishers = [publisher] if publisher else []
+
         return {
             "title": volume_info.get("title"),
             "first_publish_year": publish_year,
@@ -84,6 +87,6 @@ class GoogleBooksAPI(DataSourceInterface):
                 [volume_info.get("language")] if volume_info.get("language") else []
             ),
             "tags": tags,
-            "publisher": volume_info.get("publisher"),
+            "publishers": publishers,
             "series": None,  # Google Books API doesn't provide series information
         }
