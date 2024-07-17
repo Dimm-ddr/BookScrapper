@@ -56,6 +56,7 @@ class GoodreadsScraper(DataSourceInterface):
             self._save_response_and_exit(response)
 
         book_data = apollo_state[book_key]
+        print(f"book data: {book_data}")
 
         # Find series data
         series_key = next(
@@ -70,7 +71,11 @@ class GoodreadsScraper(DataSourceInterface):
         result: dict[str, Any] = {
             "title": book_data.get("title"),
             "authors": (
-                [book_data["primaryContributorEdge"]["node"]["name"]]
+                [
+                    book_data.get("primaryContributorEdge", {})
+                    .get("node", {})
+                    .get("name", "Unknown")
+                ]
                 if book_data.get("primaryContributorEdge")
                 else []
             ),

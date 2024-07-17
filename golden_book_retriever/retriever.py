@@ -30,6 +30,8 @@ class Retriever:
             logger.warning(f"No data found for Goodreads URL: {url}")
             return None
 
+        print("retieved data: {self.goodreads_cache}")
+
         isbn = self.goodreads_cache.get("isbn")
         title = self.goodreads_cache.get("title")
         author = self.goodreads_cache.get("authors", [None])[0]
