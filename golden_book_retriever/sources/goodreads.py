@@ -17,99 +17,118 @@ class GoodreadsScraper(DataSourceInterface):
 
     def fetch_by_isbn(self, isbn: str) -> dict[str, Any] | None:
         url: str = f"{self.BASE_URL}{isbn}"
-        return self._scrape_data(url)
+        return self.fetch_by_url(url)
 
-    def fetch_by_title_author(self, title: str, authors: list[str]) -> dict[str, Any] | None:
+    def fetch_by_title_author(
+        self, title: str, authors: list[str]
+    ) -> dict[str, Any] | None:
         # This method is not implemented for Goodreads
         return None
 
     def fetch_by_url(self, url: str) -> dict[str, Any] | None:
-        return self._scrape_data(url)
-
-    def _scrape_data(self, url: str) -> dict[str, Any] | None:
         try:
-            response: requests.Response = requests.get(url)
-            response.raise_for_status()  # Raise an exception for bad status codes
-        except requests.RequestException as e:
-            logger.error(f"Failed to fetch data from {url}: {str(e)}")
-            return None
-
-        try:
-            soup = BeautifulSoup(response.text, "html.parser")
-            script_tag = soup.find("script", id="__NEXT_DATA__")
-
-            if not script_tag:
-                self._save_response_and_exit(response)
-            elif not is_valid_script_tag(script_tag):
-                logger.error("Script tag is not valid.")
-                self._save_response_and_exit(response)
-
-            try:
-                json_data = json.loads(script_tag.string)  # type: ignore
-            except json.JSONDecodeError:
-                self._save_response_and_exit(response)
-
+            response = self._fetch_page(url)
+            json_data = self._extract_json_data(response)
             apollo_state = json_data["props"]["pageProps"]["apolloState"]
-
-            # Find book data
-            book_key = next(
-                (key for key in apollo_state.keys() if key.startswith("Book:")), None
-            )
-            if not book_key:
-                logger.error("No book data found in the response.")
-                self._save_response_and_exit(response)
-
-            book_data = apollo_state[book_key]
-            print(f"book data: {book_data}")
-
-            # Find series data
-            series_key = next(
-                (key for key in apollo_state.keys() if key.startswith("Series:")), None
-            )
-            series_data = apollo_state.get(series_key) if series_key else None
-
-            publisher = book_data.get("details", {}).get("publisher")
-            publishers = [publisher] if publisher else []
-
-            # Extract relevant information
-            result: dict[str, Any] = {
-                "title": book_data.get("title"),
-                "authors": (
-                    [
-                        book_data.get("primaryContributorEdge", {})
-                        .get("node", {})
-                        .get("name", "Unknown")
-                    ]
-                    if book_data.get("primaryContributorEdge")
-                    else []
-                ),
-                "cover": book_data.get("imageUrl"),
-                "description": book_data.get("description"),
-                "tags": [
-                    genre["genre"]["name"] for genre in book_data.get("bookGenres", [])
-                ],
-                "page_count": book_data.get("details", {}).get("numPages"),
-                "link": url,
-                "isbn": book_data.get("details", {}).get("isbn13")
-                or book_data.get("details", {}).get("isbn"),
-                "language": book_data.get("details", {})
-                .get("language", {})
-                .get("name"),
-                "publish_date": book_data.get("details", {}).get("publicationTime"),
-                "publishers": publishers,
-                "series": None,  # Default to None
-            }
-
-            # Add series information if available
-            if series_data:
-                result["series"] = series_data.get("title")
-
-            return result
-
-        except (json.JSONDecodeError, KeyError, AttributeError, ValueError) as e:
-            logger.error(f"Error parsing data from {url}: {str(e)}", exc_info=True)
+            combined_book_data = self._combine_book_data(apollo_state)
+            series_data = self._extract_series_data(apollo_state)
+            return self._compile_result(combined_book_data, series_data, url)
+        except Exception as e:
+            logger.error(f"Error scraping data from {url}: {str(e)}", exc_info=True)
             self._save_response_and_exit(response)
             return None
+
+    def _fetch_page(self, url: str) -> requests.Response:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response
+
+    def _extract_json_data(self, response: requests.Response) -> dict[str, Any]:
+        soup = BeautifulSoup(response.text, "html.parser")
+        script_tag = soup.find("script", id="__NEXT_DATA__")
+        if not script_tag or not isinstance(script_tag, Tag) or not script_tag.string:
+            raise ValueError("Invalid or missing script tag")
+        return json.loads(script_tag.string)
+
+    def _combine_book_data(self, apollo_state: dict[str, Any]) -> dict[str, Any]:
+        book_keys = [key for key in apollo_state.keys() if key.startswith("Book:")]
+        if not book_keys:
+            raise ValueError("No book data found in the response")
+        combined_book_data: dict[str, Any] = {}
+        for key in book_keys:
+            self._update_combined_data(combined_book_data, apollo_state[key])
+        return combined_book_data
+
+    def _extract_series_data(
+        self, apollo_state: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        series_key: str | None = next(
+            (key for key in apollo_state.keys() if key.startswith("Series:")), None
+        )
+        return apollo_state.get(series_key) if series_key else None
+
+    def _compile_result(
+        self, book_data: dict[str, Any], series_data: dict[str, Any] | None, url: str
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "title": book_data.get("title"),
+            "authors": self._get_authors(book_data),
+            "cover": book_data.get("imageUrl"),
+            "description": book_data.get("description"),
+            "tags": list(
+                set(genre["genre"]["name"] for genre in book_data.get("bookGenres", []))
+            ),
+            "page_count": book_data.get("details", {}).get("numPages"),
+            "link": url,
+            "isbn": book_data.get("details", {}).get("isbn13")
+            or book_data.get("details", {}).get("isbn"),
+            "language": book_data.get("details", {}).get("language", {}).get("name"),
+            "publish_date": book_data.get("details", {}).get("publicationTime"),
+            "publishers": list(
+                set(filter(None, [book_data.get("details", {}).get("publisher")]))
+            ),
+            "series": series_data.get("title") if series_data else None,
+        }
+        return {k: v for k, v in result.items() if v is not None and v != []}
+
+    def _update_combined_data(
+        self, combined_data: dict[str, Any], new_data: dict[str, Any]
+    ) -> None:
+        for key, value in new_data.items():
+            if value is None or value == [] or value == {}:
+                continue
+            if key not in combined_data:
+                combined_data[key] = value
+            elif isinstance(value, list):
+                if isinstance(combined_data[key], list):
+                    combined_data[key] = list(set(combined_data[key] + value))
+                else:
+                    combined_data[key] = [combined_data[key], value]
+            elif isinstance(value, dict):
+                if not isinstance(combined_data[key], dict):
+                    combined_data[key] = {}
+                self._update_combined_data(combined_data[key], value)
+            elif combined_data[key] != value:
+                if not isinstance(combined_data[key], list):
+                    combined_data[key] = [combined_data[key]]
+                if value not in combined_data[key]:
+                    combined_data[key].append(value)
+
+    def _get_authors(self, book_data: dict[str, Any]) -> list[str]:
+        authors = []
+        if "primaryContributorEdge" in book_data:
+            primary_author = (
+                book_data["primaryContributorEdge"].get("node", {}).get("name")
+            )
+            if primary_author:
+                authors.append(primary_author)
+        if "secondaryContributorEdges" in book_data:
+            secondary_authors = [
+                edge.get("node", {}).get("name")
+                for edge in book_data["secondaryContributorEdges"]
+            ]
+            authors.extend(filter(None, secondary_authors))
+        return list(set(authors))
 
     def _save_response_and_exit(self, response: requests.Response) -> None:
         """
@@ -126,5 +145,3 @@ class GoodreadsScraper(DataSourceInterface):
         print(f"Goodreads page structure has changed. Response saved to {filename}")
         print("Please check the file and update the scraper accordingly.")
         sys.exit(1)  # Exit the entire program
-
-    # The rest of the class remains the same

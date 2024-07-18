@@ -19,7 +19,6 @@ setup_error_handling(
         "golden_book_retriever",
         "agent_notion",
         "main",
-        # Add any other modules you want to apply error handling to
     ]
 )
 
