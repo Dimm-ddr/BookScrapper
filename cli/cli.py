@@ -70,19 +70,21 @@ def fetch_isbn(isbn_file: str, output: str | None = None) -> None:
 @click.argument("title", type=str)
 @click.argument("author", type=str)
 @click.option("--output", default=None, help="Output JSON file for book data")
-def fetch_by_title_author(title: str, author: str, output: str | None) -> None:
+def fetch_by_title_author(
+    title: str, authors: tuple[str, ...], output: str | None
+) -> None:
     """
-    Fetch book data by title and author.
+    Fetch book data by title and author(s).
 
     Args:
         title (str): The title of the book.
-        author (str): The author of the book.
+        authors (tuple[str, ...]): The author(s) of the book.
         output (str | None): Path to the output JSON file.
     """
     try:
         retriever = Retriever()
         book_data: dict[str, Any] | None = retriever.fetch_by_title_author(
-            title, author
+            title, list(authors)
         )
         if book_data:
             book = BookData(**book_data)
@@ -91,9 +93,9 @@ def fetch_by_title_author(title: str, author: str, output: str | None) -> None:
                 f.write(book.to_json())
             logging.info(f"Data saved to {output_filename!r}")
         else:
-            logging.warning(f"No data found for {title!r} by {author!r}")
+            logging.warning(f"No data found for {title!r} by {', '.join(authors)!r}")
     except Exception as e:
-        logging.error(f"Error in fetch_by_title_author: {str(e)!r}")
+        logging.error(f"Error in fetch_by_title_author: {str(e)}")
 
 
 cli.add_command(fetch_isbn)

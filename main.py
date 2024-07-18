@@ -1,22 +1,28 @@
 import sys
 import json
 from pathlib import Path
+import traceback
 from dotenv import load_dotenv
 import argparse
 import logging
 from typing import Any, Callable, LiteralString
 from agent_notion.uploader import upload_books_to_notion
 from golden_book_retriever.retriever import Retriever
+from error_handler import setup_error_handling
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,  # Set default level to DEBUG
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+
+setup_error_handling(
+    [
+        "golden_book_retriever",
+        "agent_notion",
+        "main",
+        # Add any other modules you want to apply error handling to
+    ]
 )
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -62,14 +68,37 @@ def process_file(file_path: str, process_func: Callable, retriever: Retriever) -
     """
     error_log = Path("error_log.txt")
     with open(file_path, "r") as file, open(error_log, "a") as log:
-        for line in file:
+        for line_number, line in enumerate(file, 1):
             item: str = line.strip()
             try:
                 process_func(item, retriever)
             except Exception as e:
-                error_message: str = f"Error processing {item}: {str(e)}\n"
+                # Get the full traceback
+                tb: str = traceback.format_exc()
+
+                # Log detailed error information
+                error_message = (
+                    f"Error processing item at line {line_number}: {item}\n"
+                    f"Error type: {type(e).__name__}\n"
+                    f"Error message: {str(e)}\n"
+                    f"Traceback:\n{tb}\n"
+                    f"{'-'*60}\n"
+                )
+
+                # Write to error log file
                 log.write(error_message)
-                logger.error(error_message)
+
+                # Log to console with less detail
+                logger.error(
+                    f"Error processing item at line {line_number}: {item}. Error: {str(e)}"
+                )
+
+                # Optionally, log full details to console as debug
+                logger.debug(
+                    f"Detailed error for item at line {line_number}:\n{error_message}"
+                )
+
+    logger.info(f"Finished processing file: {file_path}")
 
 
 def process_isbn(isbn: str, retriever: Retriever) -> None:
@@ -111,7 +140,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Golden Book Retriever")
     parser.add_argument("--isbn", help="Fetch book data by ISBN", type=str)
     parser.add_argument("--title", help="Book title for fetching data")
-    parser.add_argument("--author", help="Book author for fetching data")
+    parser.add_argument("--author", help="Book author(s) for fetching data", nargs="+")
     parser.add_argument("--isbn-file", help="File containing list of ISBNs", type=str)
     parser.add_argument(
         "--goodreads-file", help="File containing list of Goodreads URLs", type=str
@@ -143,12 +172,15 @@ def main() -> None:
             case argparse.Namespace(isbn=str(isbn)):
                 process_isbn(isbn, retriever)
 
-            case argparse.Namespace(title=str(title), author=str(author)):
-                logger.debug(f"Fetching data for title: {title!r}, author: {author!r}")
-                book_data: dict[str, Any] | None = retriever.fetch_by_title_author(
-                    title, author
+            case argparse.Namespace(title=str(title), author=tuple(authors)):
+                authors_str: LiteralString = ", ".join(authors)
+                logger.debug(
+                    f"Fetching data for title: {title!r}, author(s): {authors_str!r}"
                 )
-                process_book_data(book_data, f"{title!r} by {author!r}")
+                book_data: dict[str, Any] | None = retriever.fetch_by_title_author(
+                    title, list(authors)
+                )
+                process_book_data(book_data, f"{title!r} by {authors_str!r}")
 
             case _:
                 logger.error("Invalid arguments. Use --help for usage information.")

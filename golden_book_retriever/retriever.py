@@ -17,9 +17,9 @@ class Retriever:
             isbn=isbn, goodreads_data=self.goodreads_cache
         )
 
-    def fetch_by_title_author(self, title: str, author: str) -> dict[str, Any] | None:
+    def fetch_by_title_author(self, title: str, authors: list[str]) -> dict[str, Any] | None:
         return self.aggregator.fetch_data(
-            title=title, author=author, goodreads_data=self.goodreads_cache
+            title=title, authors=authors, goodreads_data=self.goodreads_cache
         )
 
     def fetch_by_goodreads_url(self, url: str) -> dict[str, Any] | None:
@@ -30,18 +30,20 @@ class Retriever:
             logger.warning(f"No data found for Goodreads URL: {url}")
             return None
 
-        print("retieved data: {self.goodreads_cache}")
+        print(f"Retrieved data: {self.goodreads_cache}")
 
         isbn = self.goodreads_cache.get("isbn")
         title = self.goodreads_cache.get("title")
-        author = self.goodreads_cache.get("authors", [None])[0]
+        authors = self.goodreads_cache.get("authors", [])
 
         if isbn:
             logger.debug(f"ISBN found: {isbn}. Fetching data from all sources.")
             return self.fetch_by_isbn(isbn)
-        elif title and author:
-            logger.debug("Title and author found. Fetching data from all sources.")
-            return self.fetch_by_title_author(title, author)
+        elif title and authors:
+            logger.debug(f"Title and author(s) found. Fetching data from all sources.")
+            return self.fetch_by_title_author(
+                title, authors[0]
+            )  # Using first author for now
         else:
             logger.warning(
                 "Insufficient data from Goodreads to fetch from other sources."

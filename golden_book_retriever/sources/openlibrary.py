@@ -24,7 +24,9 @@ class OpenLibraryAPI(DataSourceInterface):
                 return self._parse_data(data["docs"][0])
         return None
 
-    def fetch_by_title_author(self, title: str, author: str) -> dict[str, Any] | None:
+    def fetch_by_title_author(
+        self, title: str, authors: list[str]
+    ) -> dict[str, Any] | None:
         """
         Fetch book data from OpenLibrary by title and author.
 
@@ -35,6 +37,8 @@ class OpenLibraryAPI(DataSourceInterface):
         Returns:
             A dictionary containing book information, or None if not found.
         """
+        # Use the first author for the search, but keep all authors in the result
+        author: str = authors[0] if authors else ""
         params: dict[str, str] = {"q": f"title:{title} author:{author}"}
         response: requests.Response = requests.get(self.BASE_URL, params=params)
         if response.status_code == 200:

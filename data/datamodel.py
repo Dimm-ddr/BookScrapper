@@ -23,7 +23,7 @@ class BookData:
     authors: list[str] = field(default_factory=list)
     languages: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
-    publisher: str | None = None
+    publisher: list[str] = field(default_factory=list)
     series: str | None = None
 
     def __post_init__(self) -> None:

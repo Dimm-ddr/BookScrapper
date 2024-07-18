@@ -25,7 +25,7 @@ class DataAggregator:
         *,
         isbn: str | None = None,
         title: str | None = None,
-        author: str | None = None,
+        authors: list[str] | None = None,
         goodreads_data: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         book_data: dict[str, Any] = {}
@@ -36,8 +36,8 @@ class DataAggregator:
                 new_data = goodreads_data
             elif isbn is not None:
                 new_data: dict[str, Any] | None = source.fetch_by_isbn(isbn)
-            elif title is not None and author is not None:
-                new_data = source.fetch_by_title_author(title, author)
+            elif title is not None and authors is not None:
+                new_data = source.fetch_by_title_author(title, authors)
             else:
                 raise ValueError(
                     "Either ISBN or both title and author must be provided"

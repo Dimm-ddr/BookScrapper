@@ -9,6 +9,8 @@ class DataSourceInterface(ABC):
         pass
 
     @abstractmethod
-    def fetch_by_title_author(self, title: str, author: str) -> dict[str, Any] | None:
-        """Fetch book data by title and author."""
+    def fetch_by_title_author(
+        self, title: str, authors: list[str]
+    ) -> dict[str, Any] | None:
+        """Fetch book data by title and authors."""
         pass

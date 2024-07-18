@@ -21,7 +21,8 @@ class GoogleBooksAPI(DataSourceInterface):
                 return self._parse_data(items[0])
         return None
 
-    def fetch_by_title_author(self, title: str, author: str) -> dict[str, Any] | None:
+    def fetch_by_title_author(self, title: str, authors: list[str]) -> dict[str, Any] | None:
+        author = authors[0] if authors else ""
         params: dict[str, Any] = {
             "q": f"intitle:{title}+inauthor:{author}",
             "key": self.API_KEY,
