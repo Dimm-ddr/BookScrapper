@@ -16,22 +16,32 @@ class GoogleBooksAPI(DataSourceInterface):
         params: dict[str, Any] = {"q": f"isbn:{isbn}", "key": self.API_KEY}
         response: requests.Response = requests.get(self.BASE_URL, params=params)
         if response.status_code == 200:
-            items = response.json().get("items", [])
-            if items:
-                return self._parse_data(items[0])
+            raw_data = response.json()
+            compiled_data: dict[str, Any] | None = (
+                self._parse_data(raw_data.get("items", [{}])[0])
+                if raw_data.get("items")
+                else None
+            )
+            return {"raw_data": raw_data, "compiled_data": compiled_data}
         return None
 
-    def fetch_by_title_author(self, title: str, authors: list[str]) -> dict[str, Any] | None:
-        author = authors[0] if authors else ""
+    def fetch_by_title_author(
+        self, title: str, authors: list[str]
+    ) -> dict[str, Any] | None:
+        author: str = authors[0] if authors else ""
         params: dict[str, Any] = {
             "q": f"intitle:{title}+inauthor:{author}",
             "key": self.API_KEY,
         }
         response: requests.Response = requests.get(self.BASE_URL, params=params)
         if response.status_code == 200:
-            items = response.json().get("items", [])
-            if items:
-                return self._parse_data(items[0])
+            raw_data = response.json()
+            compiled_data: dict[str, Any] | None = (
+                self._parse_data(raw_data.get("items", [{}])[0])
+                if raw_data.get("items")
+                else None
+            )
+            return {"raw_data": raw_data, "compiled_data": compiled_data}
         return None
 
     def _parse_data(self, item: dict[str, Any]) -> dict[str, Any]:

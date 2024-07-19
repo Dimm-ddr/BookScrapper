@@ -17,24 +17,27 @@ class Retriever:
             isbn=isbn, goodreads_data=self.goodreads_cache
         )
 
-    def fetch_by_title_author(self, title: str, authors: list[str]) -> dict[str, Any] | None:
+    def fetch_by_title_author(
+        self, title: str, authors: list[str]
+    ) -> dict[str, Any] | None:
         return self.aggregator.fetch_data(
             title=title, authors=authors, goodreads_data=self.goodreads_cache
         )
 
     def fetch_by_goodreads_url(self, url: str) -> dict[str, Any] | None:
         logger.debug(f"Fetching data from Goodreads URL: {url}")
-        self.goodreads_cache: dict[str, Any] | None = self.goodreads.fetch_by_url(url)
+        goodreads_data: dict[str, Any] | None = self.goodreads.fetch_by_url(url)
 
-        if not self.goodreads_cache:
-            logger.warning(f"No data found for Goodreads URL: {url}")
+        if not goodreads_data or "compiled_data" not in goodreads_data:
+            logger.warning(f"No valid data found for Goodreads URL: {url}")
             return None
 
-        print(f"Retrieved data: {self.goodreads_cache}")
+        self.goodreads_cache = goodreads_data
 
-        isbn = self.goodreads_cache.get("isbn")
-        title = self.goodreads_cache.get("title")
-        authors = self.goodreads_cache.get("authors", [])
+        compiled_data = goodreads_data["compiled_data"]
+        isbn = compiled_data.get("isbn")
+        title = compiled_data.get("title")
+        authors = compiled_data.get("authors", [])
 
         if isbn:
             logger.debug(f"ISBN found: {isbn}. Fetching data from all sources.")

@@ -27,31 +27,47 @@ class GoodreadsScraper(DataSourceInterface):
 
     def fetch_by_url(self, url: str) -> dict[str, Any] | None:
         try:
-            response = self._fetch_page(url)
-            json_data = self._extract_json_data(response)
+            response: requests.Response = self._fetch_page(url)
+            html_content: str = response.text
+            script_data: str = self._extract_script_data(html_content)
+            json_data: dict[str, Any] = self._extract_json_data(script_data)
             apollo_state = json_data["props"]["pageProps"]["apolloState"]
-            combined_book_data = self._combine_book_data(apollo_state)
-            series_data = self._extract_series_data(apollo_state)
-            return self._compile_result(combined_book_data, series_data, url)
+            combined_book_data: dict[str, Any] = self._combine_book_data(apollo_state)
+            series_data: dict[str, Any] | None = self._extract_series_data(apollo_state)
+
+            raw_data: dict[str, Any] = {
+                "script_data": script_data,
+                "json_data": json_data,
+                "apollo_state": apollo_state,
+                "url": url,
+            }
+
+            compiled_result: dict[str, Any] = self._compile_result(combined_book_data, series_data, url)
+            return {"raw_data": raw_data, "compiled_data": compiled_result}
         except Exception as e:
             logger.error(f"Error scraping data from {url}: {str(e)}", exc_info=True)
             self._save_response_and_exit(response)
             return None
 
     def _fetch_page(self, url: str) -> requests.Response:
-        response = requests.get(url)
+        response: requests.Response = requests.get(url)
         response.raise_for_status()
         return response
 
-    def _extract_json_data(self, response: requests.Response) -> dict[str, Any]:
-        soup = BeautifulSoup(response.text, "html.parser")
+    def _extract_script_data(self, html_content: str) -> str:
+        soup = BeautifulSoup(html_content, "html.parser")
         script_tag = soup.find("script", id="__NEXT_DATA__")
         if not script_tag or not isinstance(script_tag, Tag) or not script_tag.string:
             raise ValueError("Invalid or missing script tag")
-        return json.loads(script_tag.string)
+        return script_tag.string
+
+    def _extract_json_data(self, script_data: str) -> dict[str, Any]:
+        return json.loads(script_data)
 
     def _combine_book_data(self, apollo_state: dict[str, Any]) -> dict[str, Any]:
-        book_keys = [key for key in apollo_state.keys() if key.startswith("Book:")]
+        book_keys: list[str] = [
+            key for key in apollo_state.keys() if key.startswith("Book:")
+        ]
         if not book_keys:
             raise ValueError("No book data found in the response")
         combined_book_data: dict[str, Any] = {}
@@ -82,7 +98,7 @@ class GoodreadsScraper(DataSourceInterface):
             "link": url,
             "isbn": book_data.get("details", {}).get("isbn13")
             or book_data.get("details", {}).get("isbn"),
-            "language": book_data.get("details", {}).get("language", {}).get("name"),
+            "languages": [book_data.get("details", {}).get("language", {}).get("name")],
             "publish_date": book_data.get("details", {}).get("publicationTime"),
             "publishers": list(
                 set(filter(None, [book_data.get("details", {}).get("publisher")]))

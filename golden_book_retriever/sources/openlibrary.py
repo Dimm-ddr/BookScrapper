@@ -7,44 +7,32 @@ class OpenLibraryAPI(DataSourceInterface):
     BASE_URL = "https://openlibrary.org/search.json"
 
     def fetch_by_isbn(self, isbn: str) -> dict[str, Any] | None:
-        """
-        Fetch book data from OpenLibrary by ISBN.
-
-        Args:
-            isbn: The ISBN of the book to fetch.
-
-        Returns:
-            A dictionary containing book information, or None if not found.
-        """
         params: dict[str, str] = {"q": f"isbn:{isbn}"}
         response: requests.Response = requests.get(self.BASE_URL, params=params)
         if response.status_code == 200:
-            data = response.json()
-            if data.get("numFound", 0) > 0:
-                return self._parse_data(data["docs"][0])
+            raw_data = response.json()
+            compiled_data = (
+                self._parse_data(raw_data["docs"][0])
+                if raw_data.get("numFound", 0) > 0
+                else None
+            )
+            return {"raw_data": raw_data, "compiled_data": compiled_data}
         return None
 
     def fetch_by_title_author(
         self, title: str, authors: list[str]
     ) -> dict[str, Any] | None:
-        """
-        Fetch book data from OpenLibrary by title and author.
-
-        Args:
-            title: The title of the book to fetch.
-            author: The author of the book to fetch.
-
-        Returns:
-            A dictionary containing book information, or None if not found.
-        """
-        # Use the first author for the search, but keep all authors in the result
         author: str = authors[0] if authors else ""
         params: dict[str, str] = {"q": f"title:{title} author:{author}"}
         response: requests.Response = requests.get(self.BASE_URL, params=params)
         if response.status_code == 200:
-            data = response.json()
-            if data.get("numFound", 0) > 0:
-                return self._parse_data(data["docs"][0])
+            raw_data = response.json()
+            compiled_data = (
+                self._parse_data(raw_data["docs"][0])
+                if raw_data.get("numFound", 0) > 0
+                else None
+            )
+            return {"raw_data": raw_data, "compiled_data": compiled_data}
         return None
 
     def _parse_data(self, data: dict[str, Any]) -> dict[str, Any]:

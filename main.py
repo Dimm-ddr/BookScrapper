@@ -76,7 +76,7 @@ def process_file(file_path: str, process_func: Callable, retriever: Retriever) -
                 tb: str = traceback.format_exc()
 
                 # Log detailed error information
-                error_message = (
+                error_message: str = (
                     f"Error processing item at line {line_number}: {item}\n"
                     f"Error type: {type(e).__name__}\n"
                     f"Error message: {str(e)}\n"

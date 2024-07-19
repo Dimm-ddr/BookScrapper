@@ -127,6 +127,60 @@ LANGUAGE_MAP: dict[str, str] = {
     "und": "Неизвестно",
 }
 
+GOODREADS_LANGUAGE_MAP: dict[str, str] = {
+    "English": "Английский",
+    "Russian": "Русский",
+    "French": "Французский",
+    "German": "Немецкий",
+    "Spanish": "Испанский",
+    "Italian": "Итальянский",
+    "Portuguese": "Португальский",
+    "Dutch": "Нидерландский",
+    "Japanese": "Японский",
+    "Chinese": "Китайский",
+    "Arabic": "Арабский",
+    "Korean": "Корейский",
+    "Hindi": "Хинди",
+    "Belarusian": "Беларуский",
+    "Ukrainian": "Украинский",
+    "Polish": "Польский",
+    "Czech": "Чешский",
+    "Swedish": "Шведский",
+    "Norwegian": "Норвежский",
+    "Finnish": "Финский",
+    "Danish": "Датский",
+    "Turkish": "Турецкий",
+    "Greek": "Греческий",
+    "Hebrew": "Иврит",
+    "Latin": "Латинский",
+    "Hungarian": "Венгерский",
+    "Romanian": "Румынский",
+    "Slovak": "Словацкий",
+    "Slovenian": "Словенский",
+    "Bulgarian": "Болгарский",
+    "Serbian": "Сербский",
+    "Croatian": "Хорватский",
+    "Catalan": "Каталанский",
+    "Lithuanian": "Литовский",
+    "Latvian": "Латышский",
+    "Estonian": "Эстонский",
+    "Vietnamese": "Вьетнамский",
+    "Thai": "Тайский",
+    "Indonesian": "Индонезийский",
+    "Malay": "Малайский",
+    "Persian": "Персидский",
+    "Urdu": "Урду",
+    "Bengali": "Бенгальский",
+    "Tamil": "Тамильский",
+    "Telugu": "Телугу",
+    "Marathi": "Маратхи",
+    "Gujarati": "Гуджарати",
+    "Kannada": "Каннада",
+    "Malayalam": "Малаялам",
+    "Basque": "Баскский",
+    "Unknown": "Неизвестно",
+}
+
 
 def log_missing_language(lang: str, book_data: dict[str, Any]) -> None:
     """
@@ -194,7 +248,7 @@ def standardize_language_code(lang: str, book_data: dict[str, Any]) -> str:
     Standardize language codes, converting them to full Russian language names.
 
     Args:
-        lang (str): The language code to standardize.
+        lang (str): The language code or name to standardize.
         book_data (Dict[str, Any]): The book data containing title, author, and ISBN.
 
     Returns:
@@ -203,9 +257,11 @@ def standardize_language_code(lang: str, book_data: dict[str, Any]) -> str:
     normalized_lang: str = lang.lower()
     if normalized_lang in LANGUAGE_MAP:
         return LANGUAGE_MAP[normalized_lang]
+    elif lang in GOODREADS_LANGUAGE_MAP:
+        return GOODREADS_LANGUAGE_MAP[lang]
     else:
         log_missing_language(lang, book_data)
-        return lang  # Return the original code if not found in the map
+        return lang
 
 
 def prepare_book_intel(book_data: dict[str, Any]) -> dict[str, Any]:
