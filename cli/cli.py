@@ -78,13 +78,13 @@ def fetch_by_title_author(
 
     Args:
         title (str): The title of the book.
-        authors (tuple[str, ...]): The author(s) of the book.
+        authors (tuple[str]): The author(s) of the book.
         output (str | None): Path to the output JSON file.
     """
     try:
         retriever = Retriever()
         book_data: dict[str, Any] | None = retriever.fetch_by_title_author(
-            title, list(authors)
+            title, tuple(authors)
         )
         if book_data:
             book = BookData(**book_data)

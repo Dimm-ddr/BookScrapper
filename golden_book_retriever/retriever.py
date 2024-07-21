@@ -18,7 +18,7 @@ class Retriever:
         )
 
     def fetch_by_title_author(
-        self, title: str, authors: list[str]
+        self, title: str, authors: tuple[str, ...]
     ) -> dict[str, Any] | None:
         return self.aggregator.fetch_data(
             title=title, authors=authors, goodreads_data=self.goodreads_cache

@@ -25,6 +25,13 @@ setup_error_handling(
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+class SetEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, set):
+            return list(obj)
+        return json.JSONEncoder.default(self, obj)
+
+
 def process_book_data(book_data: dict[str, Any] | None, search_term: str) -> None:
     """
     Process and save book data to a JSON file.
@@ -37,7 +44,8 @@ def process_book_data(book_data: dict[str, Any] | None, search_term: str) -> Non
         logger.warning(f"No data found for {search_term!r}")
         return
 
-    title = book_data.get("title")
+    compiled_book_data: dict[str, Any] = book_data.get("compiled_data", {})
+    title = compiled_book_data.get("title", None)
     if not title:
         logger.warning(f"No title found for {search_term!r}. Skipping save.")
         return
@@ -50,10 +58,15 @@ def process_book_data(book_data: dict[str, Any] | None, search_term: str) -> Non
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file: Path = output_dir / f"{safe_title}.json"
 
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(book_data, f, ensure_ascii=False, indent=2)
-
-    logger.info(f"Data for {search_term!r} saved to {output_file}")
+    try:
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(
+                compiled_book_data, f, ensure_ascii=False, indent=2, cls=SetEncoder
+            )
+        logger.info(f"Data for {search_term!r} saved to {output_file}")
+    except Exception as e:
+        logger.error(f"Error saving data for {search_term!r}: {str(e)}")
+        logger.debug(f"Problematic data: {compiled_book_data}")
 
 
 def process_file(file_path: str, process_func: Callable, retriever: Retriever) -> None:
@@ -177,7 +190,7 @@ def main() -> None:
                     f"Fetching data for title: {title!r}, author(s): {authors_str!r}"
                 )
                 book_data: dict[str, Any] | None = retriever.fetch_by_title_author(
-                    title, list(authors)
+                    title, tuple(authors)
                 )
                 process_book_data(book_data, f"{title!r} by {authors_str!r}")
 

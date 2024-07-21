@@ -3,6 +3,8 @@ from pathlib import Path
 import logging
 from typing import Any, TypeGuard
 
+from black.debug import T
+
 from .sources.goodreads import GoodreadsScraper
 from .sources.openlibrary import OpenLibraryAPI
 from .sources.googlebooks import GoogleBooksAPI
@@ -13,11 +15,11 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 class DataAggregator:
     def __init__(self) -> None:
-        self.sources: list[DataSourceInterface] = [
+        self.sources: tuple[DataSourceInterface, ...] = (
             GoodreadsScraper(),
-            OpenLibraryAPI(),
             GoogleBooksAPI(),
-        ]
+            OpenLibraryAPI(),
+        )
 
     def _check_title_match(self, title1: str, title2: str) -> bool:
         """
@@ -52,67 +54,50 @@ class DataAggregator:
         *,
         isbn: str | None = None,
         title: str | None = None,
-        authors: list[str] | None = None,
+        authors: tuple[str, ...] | None = None,
         goodreads_data: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
-        folder_name: str = self._generate_folder_name(isbn, title, authors)
-        all_data: dict[str, dict[str, Any] | None] = {}
+        book_data: dict[str, Any] = {}
 
-        for source in self.sources:
-            source_name: str = source.__class__.__name__
-            logger.info(f"Fetching data from {source_name}")
-
-            try:
-                if isinstance(source, GoodreadsScraper) and goodreads_data:
-                    new_data = goodreads_data
-                elif isbn is not None:
-                    new_data = source.fetch_by_isbn(isbn)
-                elif title is not None and authors is not None:
-                    new_data = source.fetch_by_title_author(title, authors)
-                else:
-                    raise ValueError(
-                        "Either ISBN or both title and author must be provided"
-                    )
-
-                if self._is_valid_source_data(new_data):
-                    all_data[source_name] = new_data
-                    self._save_raw_data(folder_name, source_name, new_data["raw_data"])
-                else:
-                    logger.warning(f"Invalid or no data received from {source_name}")
-                    all_data[source_name] = None
-                    self._save_raw_data(folder_name, source_name, None)
-            except Exception as e:
-                logger.error(
-                    f"Error fetching data from {source_name}: {str(e)}", exc_info=True
+        for source in reversed(self.sources):
+            logger.debug(f"Trying to fetch data from {source.__class__.__name__}")
+            if isinstance(source, GoodreadsScraper) and goodreads_data:
+                new_data = goodreads_data
+            elif isbn is not None:
+                new_data: dict[str, Any] | None = source.fetch_by_isbn(isbn)
+            elif title is not None and authors is not None:
+                new_data = source.fetch_by_title_author(title, authors)
+            else:
+                raise ValueError(
+                    "Either ISBN or both title and author must be provided"
                 )
-                all_data[source_name] = None
-                self._save_raw_data(folder_name, source_name, None)
 
-        return self._merge_data(all_data)
+            if new_data:
+                logger.debug(f"Data fetched from {source.__class__.__name__}")
+                self._merge_data(book_data, new_data)
 
-    def _is_valid_source_data(
-        self, data: dict[str, Any] | None
-    ) -> TypeGuard[dict[str, Any]]:
-        return isinstance(data, dict) and "compiled_data" in data
+        return book_data or None
 
-    def _merge_data(
-        self, all_data: dict[str, dict[str, Any] | None]
-    ) -> dict[str, Any] | None:
-        merged_data: dict[str, Any] = {}
-        priority_order: list[str] = [
-            "GoodreadsScraper",
-            "OpenLibraryAPI",
-            "GoogleBooksAPI",
-        ]
+    def _merge_data(self, target: dict[str, Any], source: dict[str, Any]) -> None:
+        for key, value in source.items():
+            if self._is_valid_value(value):
+                if key in ("tags", "authors", "publishers", "languages"):
+                    existing_value = target.get(key, set())
+                    if isinstance(existing_value, list):
+                        existing_value = set(existing_value)
+                    if isinstance(value, list):
+                        value = set(value)
+                    target[key] = existing_value | value
+                else:
+                    target[key] = value
 
-        for source in priority_order:
-            data_source: dict[str, Any] | None = all_data.get(source, None)
-            if self._is_valid_source_data(data_source):
-                source_data = data_source["compiled_data"]
-                if source_data is not None:
-                    merged_data.update(source_data)
-
-        return merged_data if merged_data else None
+    @staticmethod
+    def _is_valid_value(value: Any) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, (str, list, set, dict)):
+            return bool(value)
+        return True
 
     def _generate_folder_name(
         self, isbn: str | None, title: str | None, authors: list[str] | None

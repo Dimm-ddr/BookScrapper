@@ -20,7 +20,7 @@ class OpenLibraryAPI(DataSourceInterface):
         return None
 
     def fetch_by_title_author(
-        self, title: str, authors: list[str]
+        self, title: str, authors: tuple[str, ...]
     ) -> dict[str, Any] | None:
         author: str = authors[0] if authors else ""
         params: dict[str, str] = {"q": f"title:{title} author:{author}"}
