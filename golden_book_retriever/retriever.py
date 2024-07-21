@@ -38,6 +38,7 @@ class Retriever:
         isbn = compiled_data.get("isbn")
         title = compiled_data.get("title")
         authors = compiled_data.get("authors", [])
+        logger.info(f"ISBN: {isbn}, Title: {title}, Authors: {authors}")
 
         if isbn:
             logger.debug(f"ISBN found: {isbn}. Fetching data from all sources.")

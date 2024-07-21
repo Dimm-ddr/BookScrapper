@@ -6,9 +6,9 @@ from ..interface.data_source import DataSourceInterface
 
 class GoogleBooksAPI(DataSourceInterface):
     BASE_URL = "https://www.googleapis.com/books/v1/volumes"
-    API_KEY: str | None = os.getenv("GOOGLE_BOOKS_API_KEY")
 
     def __init__(self) -> None:
+        self.API_KEY: str | None = os.getenv("GOOGLE_BOOKS_API_KEY")
         if not self.API_KEY:
             raise ValueError("GOOGLE_BOOKS_API_KEY environment variable is not set")
 
