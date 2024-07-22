@@ -5,14 +5,14 @@ import traceback
 from dotenv import load_dotenv
 import argparse
 import logging
-from typing import Any, Callable, LiteralString
+from typing import Any
 from agent_notion.uploader import upload_books_to_notion
 from golden_book_retriever.retriever import Retriever
 from error_handler import setup_error_handling
+from book_processor import BookProcessor
 
 # Load environment variables from .env file
 load_dotenv()
-
 
 setup_error_handling(
     [
@@ -23,123 +23,6 @@ setup_error_handling(
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-class SetEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, set):
-            return list(obj)
-        return json.JSONEncoder.default(self, obj)
-
-
-def process_book_data(book_data: dict[str, Any] | None, search_term: str) -> None:
-    """
-    Process and save book data to a JSON file.
-
-    Args:
-        book_data (dict[str, Any]): The book data to process.
-        search_term (str): The search term used to find the book.
-    """
-    if not book_data:
-        logger.warning(f"No data found for {search_term!r}")
-        return
-
-    compiled_book_data: dict[str, Any] = book_data.get("compiled_data", {})
-    title = compiled_book_data.get("title", None)
-    if not title:
-        logger.warning(f"No title found for {search_term!r}. Skipping save.")
-        return
-
-    # Sanitize the title for use as a filename
-    safe_title: LiteralString = "".join(
-        c for c in title if c.isalnum() or c in (" ", "-", "_")
-    ).rstrip()
-    output_dir = Path("data/books")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_file: Path = output_dir / f"{safe_title}.json"
-
-    try:
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(
-                compiled_book_data, f, ensure_ascii=False, indent=2, cls=SetEncoder
-            )
-        logger.info(f"Data for {search_term!r} saved to {output_file}")
-    except Exception as e:
-        logger.error(f"Error saving data for {search_term!r}: {str(e)}")
-        logger.debug(f"Problematic data: {compiled_book_data}")
-
-
-def process_file(file_path: str, process_func: Callable, retriever: Retriever) -> None:
-    """
-    Process a file containing ISBNs or Goodreads URLs.
-
-    Args:
-        file_path (str): Path to the file containing ISBNs or URLs.
-        process_func (callable): Function to process each line (ISBN or URL).
-        retriever (Retriever): Retriever instance to fetch book data.
-    """
-    error_log = Path("error_log.txt")
-    with open(file_path, "r") as file, open(error_log, "a") as log:
-        for line_number, line in enumerate(file, 1):
-            item: str = line.strip()
-            try:
-                process_func(item, retriever)
-            except Exception as e:
-                # Get the full traceback
-                tb: str = traceback.format_exc()
-
-                # Log detailed error information
-                error_message: str = (
-                    f"Error processing item at line {line_number}: {item}\n"
-                    f"Error type: {type(e).__name__}\n"
-                    f"Error message: {str(e)}\n"
-                    f"Traceback:\n{tb}\n"
-                    f"{'-'*60}\n"
-                )
-
-                # Write to error log file
-                log.write(error_message)
-
-                # Log to console with less detail
-                logger.error(
-                    f"Error processing item at line {line_number}: {item}. Error: {str(e)}"
-                )
-
-                # Optionally, log full details to console as debug
-                logger.debug(
-                    f"Detailed error for item at line {line_number}:\n{error_message}"
-                )
-
-    logger.info(f"Finished processing file: {file_path}")
-
-
-def process_isbn(isbn: str, retriever: Retriever) -> None:
-    """
-    Process a single ISBN.
-
-    Args:
-        isbn (str): The ISBN to process.
-        retriever (Retriever): Retriever instance to fetch book data.
-    """
-    logger.debug(f"Fetching data for ISBN: {isbn}")
-    book_data: dict[str, Any] | None = retriever.fetch_by_isbn(isbn)
-    process_book_data(book_data, f"ISBN {isbn}")
-
-
-def process_goodreads_url(url: str, retriever: Retriever) -> None:
-    """
-    Process a single Goodreads URL.
-
-    Args:
-        url (str): The Goodreads URL to process.
-        retriever (Retriever): Retriever instance to fetch book data.
-    """
-    logger.debug(f"Fetching data for Goodreads URL: {url}")
-    book_data: dict[str, Any] | None = retriever.fetch_by_goodreads_url(url)
-    if book_data:
-        process_book_data(book_data, f"Goodreads URL {url}")
-    else:
-        logger.warning(f"No data found for Goodreads URL: {url}")
 
 
 def main() -> None:
@@ -167,36 +50,24 @@ def main() -> None:
 
     try:
         retriever = Retriever()
+        processor = BookProcessor(retriever)
 
-        match args:
-            case argparse.Namespace(upload=True):
-                logger.info("Uploading books to Notion")
-                upload_books_to_notion("data/books")
-
-            case argparse.Namespace(isbn_file=str(file_path)):
-                logger.info(f"Processing ISBNs from file: {file_path}")
-                process_file(file_path, process_isbn, retriever)
-
-            case argparse.Namespace(goodreads_file=str(file_path)):
-                logger.info(f"Processing Goodreads URLs from file: {file_path}")
-                process_file(file_path, process_goodreads_url, retriever)
-
-            case argparse.Namespace(isbn=str(isbn)):
-                process_isbn(isbn, retriever)
-
-            case argparse.Namespace(title=str(title), author=tuple(authors)):
-                authors_str: LiteralString = ", ".join(authors)
-                logger.debug(
-                    f"Fetching data for title: {title!r}, author(s): {authors_str!r}"
-                )
-                book_data: dict[str, Any] | None = retriever.fetch_by_title_author(
-                    title, tuple(authors)
-                )
-                process_book_data(book_data, f"{title!r} by {authors_str!r}")
-
-            case _:
-                logger.error("Invalid arguments. Use --help for usage information.")
-                sys.exit(1)
+        if args.upload:
+            logger.info("Uploading books to Notion")
+            upload_books_to_notion("data/books")
+        elif args.isbn_file:
+            logger.info(f"Processing ISBNs from file: {args.isbn_file}")
+            processor.process_file(args.isbn_file, processor.process_isbn)
+        elif args.goodreads_file:
+            logger.info(f"Processing Goodreads URLs from file: {args.goodreads_file}")
+            processor.process_file(args.goodreads_file, processor.process_goodreads_url)
+        elif args.isbn:
+            processor.process_isbn(args.isbn)
+        elif args.title and args.author:
+            processor.process_title_author(args.title, set(args.author))
+        else:
+            logger.error("Invalid arguments. Use --help for usage information.")
+            sys.exit(1)
 
     except Exception as e:
         logger.exception(f"An unexpected error occurred: {e!r}")

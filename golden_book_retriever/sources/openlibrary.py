@@ -16,7 +16,11 @@ class OpenLibraryAPI(DataSourceInterface):
                 if raw_data.get("numFound", 0) > 0
                 else None
             )
-            return {"raw_data": raw_data, "compiled_data": compiled_data}
+            return {
+                "source_name": "OpenLibrary",
+                "raw_data": raw_data,
+                "compiled_data": compiled_data,
+            }
         return None
 
     def fetch_by_title_author(
@@ -31,6 +35,7 @@ class OpenLibraryAPI(DataSourceInterface):
 
         if response.status_code == 200:
             raw_data = response.json()
+            compiled_data = None
             if raw_data.get("numFound", 0) > 0:
                 # Find the first result that matches our criteria
                 for doc in raw_data["docs"]:
@@ -39,7 +44,14 @@ class OpenLibraryAPI(DataSourceInterface):
                         parsed_data.get("title")
                         and set(parsed_data.get("authors", [])) & authors
                     ):
-                        return {"raw_data": raw_data, "compiled_data": parsed_data}
+                        compiled_data = parsed_data
+                        break
+
+            return {
+                "source_name": "OpenLibrary",
+                "raw_data": raw_data,
+                "compiled_data": compiled_data,
+            }
 
         return None
 

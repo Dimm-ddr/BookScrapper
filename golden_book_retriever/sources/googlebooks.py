@@ -22,7 +22,11 @@ class GoogleBooksAPI(DataSourceInterface):
                 if raw_data.get("items")
                 else None
             )
-            return {"raw_data": raw_data, "compiled_data": compiled_data}
+            return {
+                "source_name": "GoogleBooksAPI",
+                "raw_data": raw_data,
+                "compiled_data": compiled_data,
+            }
         return None
 
     def fetch_by_title_author(
@@ -48,7 +52,11 @@ class GoogleBooksAPI(DataSourceInterface):
                         parsed_data.get("title")
                         and set(parsed_data.get("authors", [])) & authors
                     ):
-                        return {"raw_data": raw_data, "compiled_data": parsed_data}
+                        return {
+                            "source_name": "GoogleBooksAPI",
+                            "raw_data": raw_data,
+                            "compiled_data": parsed_data,
+                        }
 
         return None
 

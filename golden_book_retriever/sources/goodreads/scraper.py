@@ -18,7 +18,7 @@ class GoodreadsScraper(DataSourceInterface):
         return self.fetch_by_url(url)
 
     def fetch_by_title_author(
-        self, title: str, authors: tuple[str, ...]
+        self, title: str, authors: set[str]
     ) -> dict[str, Any] | None:
         # This method is not implemented for Goodreads
         logger.warning("fetch_by_title_author is not implemented for Goodreads")

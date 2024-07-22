@@ -1,105 +1,70 @@
 import click
-import logging
-from typing import Any, List
+from typing import Any
 from data.datamodel import BookData
 from golden_book_retriever.retriever import Retriever
-
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+from book_processor import BookProcessor
+from agent_notion.uploader import upload_books_to_notion
 
 
 @click.group()
-def cli() -> None:
+@click.pass_context
+def cli(ctx: click.Context) -> None:
     """Main entry point for the CLI."""
-    pass
-
-
-def process_isbn(isbn: str, retriever: Retriever) -> BookData | None:
-    """
-    Process a single ISBN to fetch book data.
-
-    Args:
-        isbn (str): The ISBN to process.
-        retriever (Retriever): The Retriever instance to use.
-
-    Returns:
-        BookData | None: The fetched book data or None if not found.
-    """
-    try:
-        book_data: dict[str, Any] | None = retriever.fetch_by_isbn(isbn)
-        if not book_data:
-            logging.warning(f"Data for ISBN {isbn!r} not found")
-            return None
-        return BookData(**book_data)
-    except Exception as e:
-        logging.error(f"Error processing ISBN {isbn!r}: {str(e)!r}")
-        return None
+    ctx.ensure_object(dict)
 
 
 @click.command()
 @click.argument("isbn_file", type=click.Path(exists=True))
 @click.option("--output", default=None, help="Output JSON file for book data")
-def fetch_isbn(isbn_file: str, output: str | None = None) -> None:
-    """
-    Fetch book data for ISBNs listed in a file.
-
-    Args:
-        isbn_file (str): Path to the file containing ISBNs.
-        output (str | None): Path to the output JSON file.
-    """
-    try:
-        with open(isbn_file, "r") as f:
-            isbns: List[str] = f.read().splitlines()
-
-        retriever = Retriever()
-        for isbn in isbns:
-            book_data: BookData | None = process_isbn(isbn, retriever)
-            if book_data:
-                output_filename: str = (
-                    output or f"{book_data.title.replace(' ', '_')}.json"
-                )
-                with open(output_filename, "w", encoding="utf-8") as f:
-                    f.write(book_data.to_json())
-                logging.info(f"Data saved to {output_filename}")
-    except Exception as e:
-        logging.error(f"Error in fetch_isbn: {str(e)!r}")
+@click.pass_context
+def fetch_isbn(ctx: click.Context, isbn_file: str, output: str | None = None) -> None:
+    """Fetch book data for ISBNs listed in a file."""
+    processor: BookProcessor = ctx.obj["processor"]
+    processor.process_file(isbn_file, processor.process_isbn)
 
 
 @click.command()
 @click.argument("title", type=str)
-@click.argument("author", type=str)
+@click.argument("author", type=str, nargs=-1)
 @click.option("--output", default=None, help="Output JSON file for book data")
+@click.pass_context
 def fetch_by_title_author(
-    title: str, authors: tuple[str, ...], output: str | None
+    ctx: click.Context, title: str, authors: set[str], output: str | None
 ) -> None:
-    """
-    Fetch book data by title and author(s).
+    """Fetch book data by title and author(s)."""
+    processor: BookProcessor = ctx.obj["processor"]
+    processor.process_title_author(title, authors)
 
-    Args:
-        title (str): The title of the book.
-        authors (tuple[str]): The author(s) of the book.
-        output (str | None): Path to the output JSON file.
-    """
-    try:
-        retriever = Retriever()
-        book_data: dict[str, Any] | None = retriever.fetch_by_title_author(
-            title, tuple(authors)
-        )
-        if book_data:
-            book = BookData(**book_data)
-            output_filename: str = output or f"{book.title.replace(' ', '_')}.json"
-            with open(output_filename, "w", encoding="utf-8") as f:
-                f.write(book.to_json())
-            logging.info(f"Data saved to {output_filename!r}")
-        else:
-            logging.warning(f"No data found for {title!r} by {', '.join(authors)!r}")
-    except Exception as e:
-        logging.error(f"Error in fetch_by_title_author: {str(e)}")
+
+@click.command()
+@click.argument("goodreads_file", type=click.Path(exists=True))
+@click.pass_context
+def fetch_goodreads(ctx: click.Context, goodreads_file: str) -> None:
+    """Fetch book data for Goodreads URLs listed in a file."""
+    processor: BookProcessor = ctx.obj["processor"]
+    processor.process_file(goodreads_file, processor.process_goodreads_url)
+
+
+@click.command()
+def upload_to_notion() -> None:
+    """Upload books to Notion."""
+    upload_books_to_notion("data/books")
 
 
 cli.add_command(fetch_isbn)
 cli.add_command(fetch_by_title_author)
+cli.add_command(fetch_goodreads)
+cli.add_command(upload_to_notion)
 
-if __name__ == "__main__":
-    cli()
+
+def run_cli(retriever: Retriever, processor: BookProcessor) -> None:
+    """
+    Run the CLI with the given retriever and processor.
+
+    Args:
+        retriever: An instance of Retriever.
+        processor: An instance of BookProcessor.
+    """
+    ctx = click.Context(cli)
+    ctx.obj = {"retriever": retriever, "processor": processor}
+    cli(obj=ctx.obj)

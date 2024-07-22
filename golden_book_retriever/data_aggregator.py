@@ -11,7 +11,14 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class DataAggregator:
+    """
+    Aggregates book data from multiple sources.
+    """
+
     def __init__(self) -> None:
+        """
+        Initialize the DataAggregator with data sources.
+        """
         self.sources: tuple[DataSourceInterface, ...] = (
             GoodreadsScraper(),
             GoogleBooksAPI(),
@@ -51,37 +58,116 @@ class DataAggregator:
         *,
         isbn: str | None = None,
         title: str | None = None,
-        authors: tuple[str, ...] | None = None,
-        goodreads_data: dict[str, Any] | None = None,
+        authors: set[str] | None = None,
+        existing_goodreads_data: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
+        """
+        Fetch book data from multiple sources.
+
+        Args:
+            isbn: The ISBN of the book.
+            title: The title of the book.
+            authors: A tuple of author names.
+            existing_goodreads_data: Pre-existing Goodreads data, if available.
+
+        Returns:
+            A dictionary containing the aggregated book data, or None if no data is found.
+        """
         book_data: dict[str, Any] = {}
         folder_name: str = self._generate_folder_name(isbn, title, authors)
 
         for source in reversed(self.sources):
-            source_name: str = source.__class__.__name__
-            logger.debug(f"Trying to fetch data from {source_name}")
-
-            if isinstance(source, GoodreadsScraper) and goodreads_data:
-                new_data = goodreads_data
-            elif isbn is not None:
-                new_data: dict[str, Any] | None = source.fetch_by_isbn(isbn)
-            elif title is not None and authors is not None:
-                new_data = source.fetch_by_title_author(title, authors)
-            else:
-                raise ValueError(
-                    "Either ISBN or both title and author must be provided"
+            fetched_data: dict[str, Any] | None = self._fetch_from_source(
+                source, isbn, title, authors, existing_goodreads_data
+            )
+            if fetched_data:
+                logger.debug(
+                    f"Fetched data from {fetched_data.get('source_name', 'Unknown')}: {fetched_data}"
                 )
+                self._process_fetched_data(book_data, fetched_data, folder_name)
+            else:
+                logger.debug(f"No data fetched from {source.__class__.__name__}")
 
-            if new_data and isinstance(source, GoodreadsScraper) and not goodreads_data:
-                logger.debug(f"Data fetched from {source_name}")
-                compiled_data = new_data.get("compiled_data")
-                if compiled_data:
-                    self._merge_data(book_data, compiled_data)
-
-                # Save raw data
-                self._save_raw_data(folder_name, source_name, new_data.get("raw_data"))
-
+        logger.debug(f"Final aggregated book_data: {book_data}")
         return book_data or None
+
+    def _fetch_from_source(
+        self,
+        source: DataSourceInterface,
+        isbn: str | None,
+        title: str | None,
+        authors: set[str] | None,
+        existing_goodreads_data: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        """
+        Fetch data from a specific source.
+
+        Args:
+            source: The data source to fetch from.
+            isbn: The ISBN of the book.
+            title: The title of the book.
+            authors: A tuple of author names.
+            existing_goodreads_data: Pre-existing Goodreads data, if available.
+
+        Returns:
+            A dictionary containing the fetched data, or None if no data is found.
+        """
+        source_name: str = source.__class__.__name__
+        logger.debug(f"Attempting to fetch data from {source_name}")
+
+        if isinstance(source, GoodreadsScraper):
+            return self._fetch_from_goodreads(
+                source, isbn, title, authors, existing_goodreads_data
+            )
+        elif isbn:
+            return source.fetch_by_isbn(isbn)
+        elif title and authors:
+            return source.fetch_by_title_author(title, authors)
+        else:
+            logger.warning("Insufficient data provided for fetching")
+            return None
+
+    def _fetch_from_goodreads(
+        self,
+        source: GoodreadsScraper,
+        isbn: str | None,
+        title: str | None,
+        authors: set[str] | None,
+        existing_goodreads_data: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if existing_goodreads_data:
+            logger.debug("Using existing Goodreads data")
+            return {
+                "source_name": "GoodreadsCache",
+                "compiled_data": existing_goodreads_data.get("compiled_data", {}),
+                "raw_data": None,  # We don't need to save raw data for cached results
+            }
+        elif isbn:
+            return source.fetch_by_isbn(isbn)
+        elif title and authors:
+            return source.fetch_by_title_author(title, authors)
+        return None
+
+    def _process_fetched_data(
+        self,
+        book_data: dict[str, Any],
+        fetched_data: dict[str, Any],
+        folder_name: str,
+    ) -> None:
+        source_name: str = fetched_data.get("source_name", "Unknown")
+        logger.debug(f"Processing fetched data from {source_name}")
+
+        compiled_data = fetched_data.get("compiled_data")
+        if compiled_data:
+            self._merge_data(book_data, compiled_data)
+        else:
+            logger.debug(f"No compiled data found from {source_name}")
+
+        raw_data = fetched_data.get("raw_data")
+        if raw_data:
+            self._save_raw_data(folder_name, source_name, raw_data)
+        else:
+            logger.debug(f"No raw data found from {source_name}")
 
     def _merge_data(self, target: dict[str, Any], source: dict[str, Any]) -> None:
         if not isinstance(source, dict):
@@ -109,7 +195,7 @@ class DataAggregator:
         return True
 
     def _generate_folder_name(
-        self, isbn: str | None, title: str | None, authors: tuple[str, ...] | None
+        self, isbn: str | None, title: str | None, authors: set[str] | None
     ) -> str:
         if isbn:
             return f"ISBN_{isbn}"

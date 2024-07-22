@@ -12,7 +12,7 @@ class DataSourceInterface(ABC):
 
     @abstractmethod
     def fetch_by_title_author(
-        self, title: str, authors: tuple[str, ...]
+        self, title: str, authors: set[str]
     ) -> dict[str, Any] | None:
         """Fetch book data by title and authors."""
         pass
