@@ -1,5 +1,7 @@
+import hashlib
 import json
 import logging
+import re
 import traceback
 from pathlib import Path
 from typing import Any, Callable
@@ -31,6 +33,34 @@ class BookProcessor:
         """
         self.retriever: Retriever = retriever
 
+    def generate_filename(self, title: str, authors: set[str]) -> str:
+        # Sanitize the title
+        safe_title: str = re.sub(r"[^\w\-_\. ]", "_", title)
+        safe_title = safe_title.replace(" ", "_")
+
+        # Get the first author's full name, or "Unknown" if no authors
+        sorted_authors: list[str] = sorted(authors) if authors else ["Unknown"]
+        first_author: str = sorted_authors[0]
+
+        # Sanitize the author name
+        safe_author: str = re.sub(r"[^\w\-_\. ]", "_", first_author)
+        safe_author = safe_author.replace(" ", "_")
+
+        # Create a base filename
+        base_filename: str = f"{safe_title}_by_{safe_author}"
+
+        # If the base_filename is too long, truncate it
+        if len(base_filename) > 50:
+            base_filename = base_filename[:50]
+
+        # Create a hash of the full title and all authors
+        full_hash: str = hashlib.md5(f"{title}{'|'.join(authors)}".encode()).hexdigest()
+
+        # Use the first 8 characters of the hash to ensure uniqueness
+        unique_filename: str = f"{base_filename}_{full_hash[:8]}"
+
+        return unique_filename
+
     def process_book_data(
         self, book_data: dict[str, Any] | None, search_term: str
     ) -> None:
@@ -38,19 +68,17 @@ class BookProcessor:
             logger.warning(f"No data found for {search_term!r}")
             return
 
-        logger.debug(f"Processing book data: {book_data}")
-
         title = book_data.get("title")
+        authors: set[str] = book_data.get("authors", set())
+
         if not title:
             logger.warning(f"No title found for {search_term!r}. Raw data: {book_data}")
             return
 
-        safe_title: str = "".join(
-            c for c in title if c.isalnum() or c in (" ", "-", "_")
-        ).rstrip()
+        filename: str = self.generate_filename(title, authors)
         output_dir = Path("data/books")
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_file: Path = output_dir / f"{safe_title}.json"
+        output_file: Path = output_dir / f"{filename}.json"
 
         try:
             with open(output_file, "w", encoding="utf-8") as f:
