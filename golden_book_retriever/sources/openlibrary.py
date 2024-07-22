@@ -11,7 +11,7 @@ class OpenLibraryAPI(DataSourceInterface):
         response: requests.Response = requests.get(self.BASE_URL, params=params)
         if response.status_code == 200:
             raw_data = response.json()
-            compiled_data = (
+            compiled_data: dict[str, Any] | None = (
                 self._parse_data(raw_data["docs"][0])
                 if raw_data.get("numFound", 0) > 0
                 else None
@@ -20,19 +20,27 @@ class OpenLibraryAPI(DataSourceInterface):
         return None
 
     def fetch_by_title_author(
-        self, title: str, authors: tuple[str, ...]
+        self, title: str, authors: set[str]
     ) -> dict[str, Any] | None:
-        author: str = authors[0] if authors else ""
-        params: dict[str, str] = {"q": f"title:{title} author:{author}"}
+        # Construct a query that includes the title and any of the authors
+        author_query: str = " OR ".join(f"author:{author}" for author in authors)
+        query: str = f"title:{title} AND ({author_query})"
+
+        params: dict[str, str] = {"q": query}
         response: requests.Response = requests.get(self.BASE_URL, params=params)
+
         if response.status_code == 200:
             raw_data = response.json()
-            compiled_data = (
-                self._parse_data(raw_data["docs"][0])
-                if raw_data.get("numFound", 0) > 0
-                else None
-            )
-            return {"raw_data": raw_data, "compiled_data": compiled_data}
+            if raw_data.get("numFound", 0) > 0:
+                # Find the first result that matches our criteria
+                for doc in raw_data["docs"]:
+                    parsed_data: dict[str, Any] = self._parse_data(doc)
+                    if (
+                        parsed_data.get("title")
+                        and set(parsed_data.get("authors", [])) & authors
+                    ):
+                        return {"raw_data": raw_data, "compiled_data": parsed_data}
+
         return None
 
     def _parse_data(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -69,7 +77,7 @@ class OpenLibraryAPI(DataSourceInterface):
 
         publishers = data.get("publisher", [])
         if isinstance(publishers, str):
-            publishers = [publishers]
+            publishers: list[str] = [publishers]
 
         return {
             "title": title,

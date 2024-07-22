@@ -1,10 +1,7 @@
 import json
 from pathlib import Path
 import logging
-from typing import Any, TypeGuard
-
-from black.debug import T
-
+from typing import Any
 from .sources.goodreads import GoodreadsScraper
 from .sources.openlibrary import OpenLibraryAPI
 from .sources.googlebooks import GoogleBooksAPI
@@ -58,9 +55,12 @@ class DataAggregator:
         goodreads_data: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         book_data: dict[str, Any] = {}
+        folder_name: str = self._generate_folder_name(isbn, title, authors)
 
         for source in reversed(self.sources):
-            logger.debug(f"Trying to fetch data from {source.__class__.__name__}")
+            source_name: str = source.__class__.__name__
+            logger.debug(f"Trying to fetch data from {source_name}")
+
             if isinstance(source, GoodreadsScraper) and goodreads_data:
                 new_data = goodreads_data
             elif isbn is not None:
@@ -72,13 +72,22 @@ class DataAggregator:
                     "Either ISBN or both title and author must be provided"
                 )
 
-            if new_data:
-                logger.debug(f"Data fetched from {source.__class__.__name__}")
-                self._merge_data(book_data, new_data)
+            if new_data and isinstance(source, GoodreadsScraper) and not goodreads_data:
+                logger.debug(f"Data fetched from {source_name}")
+                compiled_data = new_data.get("compiled_data")
+                if compiled_data:
+                    self._merge_data(book_data, compiled_data)
+
+                # Save raw data
+                self._save_raw_data(folder_name, source_name, new_data.get("raw_data"))
 
         return book_data or None
 
     def _merge_data(self, target: dict[str, Any], source: dict[str, Any]) -> None:
+        if not isinstance(source, dict):
+            logger.warning(f"Invalid source data type: {type(source)}. Expected dict.")
+            return
+
         for key, value in source.items():
             if self._is_valid_value(value):
                 if key in ("tags", "authors", "publishers", "languages"):
@@ -100,7 +109,7 @@ class DataAggregator:
         return True
 
     def _generate_folder_name(
-        self, isbn: str | None, title: str | None, authors: list[str] | None
+        self, isbn: str | None, title: str | None, authors: tuple[str, ...] | None
     ) -> str:
         if isbn:
             return f"ISBN_{isbn}"
@@ -108,10 +117,18 @@ class DataAggregator:
             safe_title: str = "".join(
                 c for c in title if c.isalnum() or c in (" ", "-", "_")
             ).rstrip()
-            safe_author: str = "".join(
-                c for c in authors[0] if c.isalnum() or c in (" ", "-", "_")
-            ).rstrip()
-            return f"{safe_title}_by_{safe_author}"
+
+            # Handle the case where authors is a tuple of strings
+            if authors:
+                first_author: str = next(
+                    iter(authors), ""
+                )  # Get the first author safely
+                safe_author: str = "".join(
+                    c for c in first_author if c.isalnum() or c in (" ", "-", "_")
+                ).rstrip()
+                return f"{safe_title}_by_{safe_author}"
+            else:
+                return safe_title
         else:
             return "unknown_book"
 

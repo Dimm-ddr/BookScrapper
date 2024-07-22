@@ -26,22 +26,30 @@ class GoogleBooksAPI(DataSourceInterface):
         return None
 
     def fetch_by_title_author(
-        self, title: str, authors: tuple[str, ...]
+        self, title: str, authors: set[str]
     ) -> dict[str, Any] | None:
-        author: str = authors[0] if authors else ""
+        # Construct a query that includes the title and any of the authors
+        author_query: str = " OR ".join(f"inauthor:{author}" for author in authors)
+        query: str = f"intitle:{title} AND ({author_query})"
+
         params: dict[str, Any] = {
-            "q": f"intitle:{title}+inauthor:{author}",
+            "q": query,
             "key": self.API_KEY,
         }
+
         response: requests.Response = requests.get(self.BASE_URL, params=params)
+
         if response.status_code == 200:
             raw_data = response.json()
-            compiled_data: dict[str, Any] | None = (
-                self._parse_data(raw_data.get("items", [{}])[0])
-                if raw_data.get("items")
-                else None
-            )
-            return {"raw_data": raw_data, "compiled_data": compiled_data}
+            if raw_data.get("items"):
+                for item in raw_data["items"]:
+                    parsed_data: dict[str, Any] = self._parse_data(item)
+                    if (
+                        parsed_data.get("title")
+                        and set(parsed_data.get("authors", [])) & authors
+                    ):
+                        return {"raw_data": raw_data, "compiled_data": parsed_data}
+
         return None
 
     def _parse_data(self, item: dict[str, Any]) -> dict[str, Any]:
@@ -70,7 +78,7 @@ class GoogleBooksAPI(DataSourceInterface):
         description = volume_info.get("description", "")
         subtitle = volume_info.get("subtitle")
         if subtitle and subtitle not in description:
-            description = f"{subtitle}\n\n{description}".strip()
+            description: str = f"{subtitle}\n\n{description}".strip()
 
         # Use categories as tags
         tags = volume_info.get("categories", [])
@@ -82,7 +90,7 @@ class GoogleBooksAPI(DataSourceInterface):
             publish_year = int(published_date.split("-")[0])
 
         publisher = volume_info.get("publisher")
-        publishers = [publisher] if publisher else []
+        publishers: list[Any] = [publisher] if publisher else []
 
         return {
             "title": volume_info.get("title"),

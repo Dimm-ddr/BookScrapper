@@ -35,7 +35,8 @@ class MissionControl:
         Initialize MissionControl with Notion client and database ID.
         """
         self.notion = Client(auth=os.environ["NOTION_SECRET"])
-        self.database_id: str = os.environ["DATABASE_ID"]
+        self.database_id: str = os.environ["TESTING_DATABASE_ID"]
+        # self.database_id: str = os.environ["DATABASE_ID"]
 
     def _is_dict_response(self, obj: Any) -> TypeGuard[dict[str, Any]]:
         """
