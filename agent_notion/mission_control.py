@@ -2,7 +2,7 @@
 
 import os
 import time
-from typing import Any, Awaitable, TypeGuard, List
+from typing import Any, Awaitable, TypeGuard
 from notion_client import APIResponseError, Client
 import logging
 import re
@@ -50,12 +50,14 @@ class MissionControl:
         """
         return isinstance(obj, dict) and "id" in obj
 
-    def check_book_existence(self, title: str) -> bool:
+    def check_book_existence(self, title: str, isbn: str, authors: list[str]) -> bool:
         """
-        Check if a book with the given title already exists in the Notion database.
+        Check if a book with the given title, ISBN, or authors already exists in the Notion database.
 
         Args:
             title (str): The title of the book to check.
+            isbn (str): The ISBN of the book to check.
+            authors (list[str]): The list of authors of the book to check.
 
         Returns:
             bool: True if the book exists, False otherwise.
@@ -65,18 +67,25 @@ class MissionControl:
 
         while retries < max_retries:
             try:
-                query_filter: dict[str, Any] = {
-                    "property": "Название",
-                    "title": {"equals": title},
+                query_filter = {
+                    "or": [
+                        {"property": "ISBN", "rich_text": {"equals": isbn}},
+                        {
+                            "and": [
+                                {"property": "Название", "title": {"equals": title}},
+                                {"property": "Авторы", "multi_select": {"contains": authors[0]}},
+                            ]
+                        }
+                    ]
                 }
                 response = self.notion.databases.query(
                     database_id=self.database_id, filter=query_filter
                 )
 
-                if self._is_dict_response(response):
-                    return len(response.get("results", [])) > 0
+                if isinstance(response, dict) and "results" in response:
+                    return len(response["results"]) > 0
                 else:
-                    raise TypeError("Unexpected response type from Notion API")
+                    raise TypeError(f"Unexpected response type from Notion API: {response!r}")
 
             except APIResponseError as e:
                 if e.code == "rate_limited":
@@ -99,34 +108,39 @@ class MissionControl:
                 )
                 break
 
-        else:
-            logger.error("Max retries reached. Exiting mission.")
-            exit()
-
+        logger.error("Max retries reached or an error occurred. Exiting mission.")
         return False
 
     def upload_book(self, book_data: dict[str, Any]) -> None:
         """
-        Upload a single book to Notion.
+        Upload a single book to Notion if it doesn't already exist.
 
         Args:
-            book_data (Dict[str, Any]): The book data to upload.
+            book_data (dict[str, Any]): The book data to upload.
         """
         try:
-            properties: dict[str, Any] = prepare_book_intel(book_data)
+            title = book_data.get("title", "")
+            isbn = book_data.get("isbn", "")
+            authors = book_data.get("authors", [])
 
-            new_page: Any | Awaitable[Any] = self.notion.pages.create(
-                parent={"database_id": self.database_id}, properties=properties
-            )
+            if not self.check_book_existence(title, isbn, authors):
+                properties: dict[str, Any] = prepare_book_intel(book_data)
 
-            if self._is_dict_response(new_page):
-                self._add_description_to_page(
-                    new_page["id"], book_data.get("description", "")
+                new_page: Any | Awaitable[Any] = self.notion.pages.create(
+                    parent={"database_id": self.database_id}, properties=properties
                 )
+
+                if isinstance(new_page, dict) and "id" in new_page:
+                    self._add_description_to_page(
+                        new_page["id"], book_data.get("description", "")
+                    )
+                    logger.info(f"Book '{title}' successfully uploaded to Notion.")
+                else:
+                    raise TypeError(
+                        "Unexpected response type from Notion API when creating page"
+                    )
             else:
-                raise TypeError(
-                    "Unexpected response type from Notion API when creating page"
-                )
+                logger.info(f"Book '{title}' already exists in the database. Skipping upload.")
         except Exception as e:
             logger.error(
                 f"Error uploading book {book_data.get('title', 'Unknown')!r}: {str(e)!r}",
@@ -145,7 +159,7 @@ class MissionControl:
         if not description or not page_id:
             return
 
-        blocks: List[dict[str, Any]] = [
+        blocks: list[dict[str, Any]] = [
             {
                 "object": "block",
                 "type": "heading_2",
@@ -158,7 +172,7 @@ class MissionControl:
         ]
 
         # Split description into sentences
-        sentences: List[str | Any] = re.split(r"(?<=[.!?])\s+", description)
+        sentences: list[str | Any] = re.split(r"(?<=[.!?])\s+", description)
         current_block = ""
 
         for sentence in sentences:

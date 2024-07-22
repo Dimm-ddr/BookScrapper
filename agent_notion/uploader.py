@@ -8,6 +8,16 @@ from .mission_control import MissionControl
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+# agent_notion/uploader.py
+
+import json
+from pathlib import Path
+import logging
+from .mission_control import MissionControl
+
+logger: logging.Logger = logging.getLogger(__name__)
+
+
 def upload_books_to_notion(books_dir: str) -> None:
     """
     Upload books from a directory to Notion.
@@ -23,14 +33,25 @@ def upload_books_to_notion(books_dir: str) -> None:
     books_path = Path(books_dir)
 
     for book_file in books_path.glob("*.json"):
-        with open(book_file, "r", encoding="utf-8") as f:
-            book_data = json.load(f)
+        try:
+            with open(book_file, "r", encoding="utf-8") as f:
+                book_data = json.load(f)
 
-        asset_title: str = book_data.get("title", "Unknown Asset")
-        if not mission_control.check_book_existence(book_data.get("title", "")):
-            mission_control.upload_book(book_data)
-            logger.info(f"Intelligence on {asset_title} uploaded.")
-        else:
-            logger.info(
-                f"Intelligence on {asset_title} already exists. Mission aborted."
-            )
+            title: str = book_data.get("title", "Unknown Asset")
+            isbn: str = book_data.get("isbn", "")
+            authors: list[str] = book_data.get("authors", [])
+
+            if not mission_control.check_book_existence(title, isbn, authors):
+                mission_control.upload_book(book_data)
+                logger.info(f"Intelligence on '{title}' uploaded.")
+            else:
+                logger.info(
+                    f"Intelligence on '{title}' already exists. Mission aborted."
+                )
+
+        except json.JSONDecodeError:
+            logger.error(f"Error decoding JSON from file: {book_file}")
+        except Exception as e:
+            logger.error(f"Error processing file {book_file}: {str(e)}")
+
+    logger.info("Book upload mission completed.")
