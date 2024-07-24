@@ -35,8 +35,8 @@ class MissionControl:
         Initialize MissionControl with Notion client and database ID.
         """
         self.notion = Client(auth=os.environ["NOTION_SECRET"])
-        self.database_id: str = os.environ["TESTING_DATABASE_ID"]
-        # self.database_id: str = os.environ["DATABASE_ID"]
+        # self.database_id: str = os.environ["TESTING_DATABASE_ID"]
+        self.database_id: str = os.environ["DATABASE_ID"]
 
     def _is_dict_response(self, obj: Any) -> TypeGuard[dict[str, Any]]:
         """
@@ -73,9 +73,12 @@ class MissionControl:
                         {
                             "and": [
                                 {"property": "Название", "title": {"equals": title}},
-                                {"property": "Авторы", "multi_select": {"contains": authors[0]}},
+                                {
+                                    "property": "Авторы",
+                                    "multi_select": {"contains": authors[0]},
+                                },
                             ]
-                        }
+                        },
                     ]
                 }
                 response = self.notion.databases.query(
@@ -85,7 +88,9 @@ class MissionControl:
                 if isinstance(response, dict) and "results" in response:
                     return len(response["results"]) > 0
                 else:
-                    raise TypeError(f"Unexpected response type from Notion API: {response!r}")
+                    raise TypeError(
+                        f"Unexpected response type from Notion API: {response!r}"
+                    )
 
             except APIResponseError as e:
                 if e.code == "rate_limited":
@@ -140,7 +145,9 @@ class MissionControl:
                         "Unexpected response type from Notion API when creating page"
                     )
             else:
-                logger.info(f"Book '{title}' already exists in the database. Skipping upload.")
+                logger.info(
+                    f"Book '{title}' already exists in the database. Skipping upload."
+                )
         except Exception as e:
             logger.error(
                 f"Error uploading book {book_data.get('title', 'Unknown')!r}: {str(e)!r}",
