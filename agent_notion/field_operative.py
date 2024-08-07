@@ -213,6 +213,19 @@ def sanitize_multiselect(items: list[str]) -> list[str]:
     return [item.replace(",", "").strip() for item in items]
 
 
+def sanitize_select(item: str) -> str:
+    """
+    Sanitize items for a multi-select field by removing commas and trimming whitespace.
+
+    Args:
+        items (list[str]): list of items to sanitize.
+
+    Returns:
+        list[str]: Sanitized list of items.
+    """
+    return item.replace(",", "").strip()
+
+
 def enhance_title(title: str) -> str:
     """
     Enhance a title by capitalizing each word.
@@ -289,7 +302,7 @@ def prepare_book_intel(book_data: dict[str, Any]) -> dict[str, Any]:
         standardize_language_code(lang, book_data) for lang in languages
     ]
 
-    return {
+    prepared_data: dict[str, Any] = {
         "Название": {
             "title": [{"text": {"content": enhance_title(book_data.get("title", ""))}}]
         },
@@ -330,3 +343,9 @@ def prepare_book_intel(book_data: dict[str, Any]) -> dict[str, Any]:
             ]
         },
     }
+
+    series = book_data.get("series", None)
+    if series is not None:
+        prepared_data["Серия"] = {"select": {"name": sanitize_select(series)}}
+
+    return prepared_data
