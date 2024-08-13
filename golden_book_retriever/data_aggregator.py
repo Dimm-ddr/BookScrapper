@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import logging
 from typing import Any
+
+from golden_book_retriever.utils.string_utils import normalize_tags
 from .sources.goodreads import GoodreadsScraper
 from .sources.openlibrary import OpenLibraryAPI
 from .sources.googlebooks import GoogleBooksAPI
@@ -176,13 +178,17 @@ class DataAggregator:
 
         for key, value in source.items():
             if self._is_valid_value(value):
-                if key in ("tags", "authors", "publishers", "languages"):
+                if key == "tags":
+                    existing_tags = set(target.get(key, []))
+                    new_tags = set(value) if isinstance(value, list) else {value}
+                    target[key] = normalize_tags(list(existing_tags | new_tags))
+                elif key in ("authors", "publishers", "languages"):
                     existing_value = target.get(key, set())
                     if isinstance(existing_value, list):
                         existing_value = set(existing_value)
                     if isinstance(value, list):
                         value = set(value)
-                    target[key] = existing_value | value
+                    target[key] = list(existing_value | value)
                 else:
                     target[key] = value
 

@@ -2,20 +2,25 @@
 
 import os
 import time
-from typing import Any, Awaitable, TypeGuard
+from typing import Any, Awaitable, TypeGuard, List, Tuple
 from notion_client import APIResponseError, Client
 import logging
 import re
+from html.parser import HTMLParser
+from logging.handlers import RotatingFileHandler
 from .field_operative import prepare_book_intel
 
 # Set up package-specific logger
-logger: logging.Logger = logging.getLogger("agent_notion")
+logger = logging.getLogger("agent_notion")
 logger.setLevel(logging.ERROR)
 
-# Create a file handler
+# Create a rotating file handler
 error_log_file = "agent_notion_errors.log"
-file_handler = logging.FileHandler(error_log_file)
+file_handler = RotatingFileHandler(
+    error_log_file, maxBytes=1024 * 1024, backupCount=5, encoding="utf-8"
+)
 file_handler.setLevel(logging.ERROR)
+
 
 # Create a formatting configuration
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -23,6 +28,22 @@ file_handler.setFormatter(formatter)
 
 # Add the file handler to the logger
 logger.addHandler(file_handler)
+
+
+class SimpleHTMLParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.result: List[Tuple[str, str]] = []
+        self.current_tag = ""
+
+    def handle_starttag(self, tag: str, attrs: List[Tuple[str, str | None]]) -> None:
+        self.current_tag = tag
+
+    def handle_data(self, data: str) -> None:
+        self.result.append((self.current_tag, data))
+
+    def handle_endtag(self, tag: str) -> None:
+        self.current_tag = ""
 
 
 class MissionControl:
@@ -35,8 +56,9 @@ class MissionControl:
         Initialize MissionControl with Notion client and database ID.
         """
         self.notion = Client(auth=os.environ["NOTION_SECRET"])
-        # self.database_id: str = os.environ["TESTING_DATABASE_ID"]
-        self.database_id: str = os.environ["DATABASE_ID"]
+        self.database_id: str = os.environ["TESTING_DATABASE_ID"]
+        # self.database_id: str = os.environ["DATABASE_ID"]
+        logger.info("MissionControl initialized")
 
     def _is_dict_response(self, obj: Any) -> TypeGuard[dict[str, Any]]:
         """
@@ -128,8 +150,12 @@ class MissionControl:
             isbn = book_data.get("isbn", "")
             authors = book_data.get("authors", [])
 
+            logger.info(f"Attempting to upload book: {title}")
+
             if not self.check_book_existence(title, isbn, authors):
                 properties: dict[str, Any] = prepare_book_intel(book_data)
+
+                logger.debug(f"Prepared book intel: {properties}")
 
                 new_page: Any | Awaitable[Any] = self.notion.pages.create(
                     parent={"database_id": self.database_id}, properties=properties
@@ -142,17 +168,56 @@ class MissionControl:
                     logger.info(f"Book '{title}' successfully uploaded to Notion.")
                 else:
                     raise TypeError(
-                        "Unexpected response type from Notion API when creating page"
+                        f"Unexpected response type from Notion API when creating page: {type(new_page)}"
                     )
             else:
                 logger.info(
                     f"Book '{title}' already exists in the database. Skipping upload."
                 )
         except Exception as e:
-            logger.error(
-                f"Error uploading book {book_data.get('title', 'Unknown')!r}: {str(e)!r}",
-                exc_info=True,
+            logger.exception(
+                f"Error uploading book {book_data.get('title', 'Unknown')!r}: {str(e)!r}"
             )
+
+    def _html_to_notion_blocks(self, html_content: str) -> List[dict]:
+        parser = SimpleHTMLParser()
+        parser.feed(html_content)
+
+        blocks = []
+        current_paragraph = {"type": "paragraph", "paragraph": {"rich_text": []}}
+
+        for tag, content in parser.result:
+            if tag in ("b", "strong"):
+                current_paragraph["paragraph"]["rich_text"].append(
+                    {
+                        "type": "text",
+                        "text": {"content": content},
+                        "annotations": {"bold": True},
+                    }
+                )
+            elif tag in ("i", "em"):
+                current_paragraph["paragraph"]["rich_text"].append(
+                    {
+                        "type": "text",
+                        "text": {"content": content},
+                        "annotations": {"italic": True},
+                    }
+                )
+            else:
+                if current_paragraph["paragraph"]["rich_text"]:
+                    blocks.append(current_paragraph)
+                    current_paragraph = {
+                        "type": "paragraph",
+                        "paragraph": {"rich_text": []},
+                    }
+                current_paragraph["paragraph"]["rich_text"].append(
+                    {"type": "text", "text": {"content": content}}
+                )
+
+        if current_paragraph["paragraph"]["rich_text"]:
+            blocks.append(current_paragraph)
+
+        return blocks
 
     def _add_description_to_page(self, page_id: str, description: str) -> None:
         """
@@ -166,7 +231,7 @@ class MissionControl:
         if not description or not page_id:
             return
 
-        blocks: list[dict[str, Any]] = [
+        blocks = [
             {
                 "object": "block",
                 "type": "heading_2",
@@ -178,44 +243,9 @@ class MissionControl:
             }
         ]
 
-        # Split description into sentences
-        sentences: list[str | Any] = re.split(r"(?<=[.!?])\s+", description)
-        current_block = ""
-
-        for sentence in sentences:
-            if len(current_block) + len(sentence) > 2000:
-                # Add the current block to the blocks list
-                blocks.append(
-                    {
-                        "object": "block",
-                        "type": "paragraph",
-                        "paragraph": {
-                            "rich_text": [
-                                {
-                                    "type": "text",
-                                    "text": {"content": current_block.strip()},
-                                }
-                            ]
-                        },
-                    }
-                )
-                current_block: str | Any = sentence
-            else:
-                current_block += " " + sentence
-
-        # Add the last block
-        if current_block:
-            blocks.append(
-                {
-                    "object": "block",
-                    "type": "paragraph",
-                    "paragraph": {
-                        "rich_text": [
-                            {"type": "text", "text": {"content": current_block.strip()}}
-                        ]
-                    },
-                }
-            )
+        # Convert HTML to Notion blocks
+        description_blocks = self._html_to_notion_blocks(description)
+        blocks.extend(description_blocks)
 
         try:
             self.notion.blocks.children.append(page_id, children=blocks)
