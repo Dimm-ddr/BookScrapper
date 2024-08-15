@@ -180,7 +180,7 @@ class DataAggregator:
             if self._is_valid_value(value):
                 if key == "tags":
                     existing_tags = set(target.get(key, []))
-                    new_tags = set(value) if isinstance(value, list) else {value}
+                    new_tags = set(value)
                     target[key] = normalize_tags(list(existing_tags | new_tags))
                 elif key in ("authors", "publishers", "languages"):
                     existing_value = target.get(key, set())
