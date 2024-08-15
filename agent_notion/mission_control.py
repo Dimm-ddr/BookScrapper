@@ -2,11 +2,11 @@
 
 import os
 import time
-from typing import Any, Awaitable, TypeGuard, List, Tuple
+from typing import Any, Awaitable, TypeGuard
 from notion_client import APIResponseError, Client
 import logging
 from logging.handlers import RotatingFileHandler
-from .field_operative import prepare_book_intel
+from .field_operative import prepare_book_intel, prepare_description_for_notion
 
 # Set up package-specific logger
 logger: logging.Logger = logging.getLogger("agent_notion")
@@ -121,31 +121,25 @@ class MissionControl:
         return False
 
     def upload_book(self, book_data: dict[str, Any]) -> None:
-        """
-        Upload a single book to Notion if it doesn't already exist.
-
-        Args:
-            book_data (dict[str, Any]): The book data to upload.
-        """
         try:
-            title = book_data.get("title", "")
-            isbn = book_data.get("isbn", "")
-            authors = book_data.get("authors", [])
+            title: str = book_data.get("title", "")
+            isbn: str = book_data.get("isbn", "")
+            authors: list[str] = book_data.get("authors", [])
 
             logger.info(f"Attempting to upload book: {title}")
 
             if not self.check_book_existence(title, isbn, authors):
                 properties: dict[str, Any] = prepare_book_intel(book_data)
-
-                logger.debug(f"Prepared book intel: {properties}")
-
                 new_page: Any | Awaitable[Any] = self.notion.pages.create(
                     parent={"database_id": self.database_id}, properties=properties
                 )
 
                 if isinstance(new_page, dict) and "id" in new_page:
-                    self._add_description_to_page(
-                        new_page["id"], book_data.get("description", "")
+                    description_blocks = prepare_description_for_notion(
+                        book_data.get("description", "")
+                    )
+                    self.notion.blocks.children.append(
+                        new_page["id"], children=description_blocks
                     )
                     logger.info(f"Book '{title}' successfully uploaded to Notion.")
                 else:
