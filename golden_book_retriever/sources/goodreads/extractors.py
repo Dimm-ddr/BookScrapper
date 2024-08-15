@@ -1,7 +1,9 @@
 # extractors.py
 
 import logging
+import re
 from typing import Any, Dict
+from bs4 import BeautifulSoup
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -42,7 +44,21 @@ class BookDataExtractor:
         return self.combined_book_data.get("imageUrl", "")
 
     def _extract_description(self) -> str:
-        return self.combined_book_data.get("description", "")
+        description = self.combined_book_data.get("description", "")
+        return self._clean_html(description)
+
+    def _clean_html(self, html_content: str) -> str:
+        # Remove HTML tags
+        soup = BeautifulSoup(html_content, "html.parser")
+        text = soup.get_text()
+
+        # Fix spacing after punctuation
+        text = re.sub(r"([.!?])([A-Z])", r"\1 \2", text)
+
+        # Remove extra whitespace
+        text = re.sub(r"\s+", " ", text).strip()
+
+        return text
 
     def _extract_page_count(self) -> int:
         return self.combined_book_data.get("details", {}).get("numPages", 0)

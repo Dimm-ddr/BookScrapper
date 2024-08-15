@@ -5,13 +5,11 @@ import time
 from typing import Any, Awaitable, TypeGuard, List, Tuple
 from notion_client import APIResponseError, Client
 import logging
-import re
-from html.parser import HTMLParser
 from logging.handlers import RotatingFileHandler
 from .field_operative import prepare_book_intel
 
 # Set up package-specific logger
-logger = logging.getLogger("agent_notion")
+logger: logging.Logger = logging.getLogger("agent_notion")
 logger.setLevel(logging.ERROR)
 
 # Create a rotating file handler
@@ -28,22 +26,6 @@ file_handler.setFormatter(formatter)
 
 # Add the file handler to the logger
 logger.addHandler(file_handler)
-
-
-class SimpleHTMLParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.result: List[Tuple[str, str]] = []
-        self.current_tag = ""
-
-    def handle_starttag(self, tag: str, attrs: List[Tuple[str, str | None]]) -> None:
-        self.current_tag = tag
-
-    def handle_data(self, data: str) -> None:
-        self.result.append((self.current_tag, data))
-
-    def handle_endtag(self, tag: str) -> None:
-        self.current_tag = ""
 
 
 class MissionControl:
@@ -179,50 +161,9 @@ class MissionControl:
                 f"Error uploading book {book_data.get('title', 'Unknown')!r}: {str(e)!r}"
             )
 
-    def _html_to_notion_blocks(self, html_content: str) -> List[dict]:
-        parser = SimpleHTMLParser()
-        parser.feed(html_content)
-
-        blocks = []
-        current_paragraph = {"type": "paragraph", "paragraph": {"rich_text": []}}
-
-        for tag, content in parser.result:
-            if tag in ("b", "strong"):
-                current_paragraph["paragraph"]["rich_text"].append(
-                    {
-                        "type": "text",
-                        "text": {"content": content},
-                        "annotations": {"bold": True},
-                    }
-                )
-            elif tag in ("i", "em"):
-                current_paragraph["paragraph"]["rich_text"].append(
-                    {
-                        "type": "text",
-                        "text": {"content": content},
-                        "annotations": {"italic": True},
-                    }
-                )
-            else:
-                if current_paragraph["paragraph"]["rich_text"]:
-                    blocks.append(current_paragraph)
-                    current_paragraph = {
-                        "type": "paragraph",
-                        "paragraph": {"rich_text": []},
-                    }
-                current_paragraph["paragraph"]["rich_text"].append(
-                    {"type": "text", "text": {"content": content}}
-                )
-
-        if current_paragraph["paragraph"]["rich_text"]:
-            blocks.append(current_paragraph)
-
-        return blocks
-
     def _add_description_to_page(self, page_id: str, description: str) -> None:
         """
-        Add the full description as content to the Notion page,
-            split into blocks of 2000 characters or less.
+        Add the full description as content to the Notion page.
 
         Args:
             page_id (str): The ID of the Notion page.
@@ -240,12 +181,15 @@ class MissionControl:
                         {"type": "text", "text": {"content": "Полное описание"}}
                     ]
                 },
-            }
+            },
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"type": "text", "text": {"content": description}}]
+                },
+            },
         ]
-
-        # Convert HTML to Notion blocks
-        description_blocks = self._html_to_notion_blocks(description)
-        blocks.extend(description_blocks)
 
         try:
             self.notion.blocks.children.append(page_id, children=blocks)
