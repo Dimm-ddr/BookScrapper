@@ -44,4 +44,4 @@ def prepare_description_blocks(description: str) -> list[dict[str, Any]]:
 
 
 # Import these functions from text_utils.py
-from text_utils import sanitize_field_value, sanitize_list
+from .text_utils import sanitize_field_value, sanitize_list
