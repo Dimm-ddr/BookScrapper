@@ -5,92 +5,66 @@ import time
 from typing import Any, Awaitable, TypeGuard
 from notion_client import APIResponseError, Client
 import logging
-from logging.handlers import RotatingFileHandler
+import json
+from pathlib import Path
+
+from constants import NOTION_DATABASE_ID
 from .field_operative import prepare_book_intel, prepare_description_for_notion
 
-# Set up package-specific logger
-logger: logging.Logger = logging.getLogger("agent_notion")
-logger.setLevel(logging.ERROR)
-
-# Create a rotating file handler
-error_log_file = "agent_notion_errors.log"
-file_handler = RotatingFileHandler(
-    error_log_file, maxBytes=1024 * 1024, backupCount=5, encoding="utf-8"
-)
-file_handler.setLevel(logging.ERROR)
-
-
-# Create a formatting configuration
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-file_handler.setFormatter(formatter)
-
-# Add the file handler to the logger
-logger.addHandler(file_handler)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class MissionControl:
-    """
-    Handles interactions with the Notion API for book data upload.
-    """
-
     def __init__(self) -> None:
-        """
-        Initialize MissionControl with Notion client and database ID.
-        """
         self.notion = Client(auth=os.environ["NOTION_SECRET"])
-        self.database_id: str = os.environ["TESTING_DATABASE_ID"]
-        # self.database_id: str = os.environ["DATABASE_ID"]
-        logger.info("MissionControl initialized")
+        self.database_id: str = NOTION_DATABASE_ID
 
     def _is_dict_response(self, obj: Any) -> TypeGuard[dict[str, Any]]:
-        """
-        Type guard to check if an object is a dictionary response from Notion API.
-
-        Args:
-            obj (Any): The object to check.
-
-        Returns:
-            bool: True if the object is a dictionary with an "id" key, False otherwise.
-        """
         return isinstance(obj, dict) and "id" in obj
 
     def check_book_existence(self, title: str, isbn: str, authors: list[str]) -> bool:
-        """
-        Check if a book with the given title, ISBN, or authors already exists in the Notion database.
-
-        Args:
-            title (str): The title of the book to check.
-            isbn (str): The ISBN of the book to check.
-            authors (list[str]): The list of authors of the book to check.
-
-        Returns:
-            bool: True if the book exists, False otherwise.
-        """
         max_retries = 3
         retries = 0
 
         while retries < max_retries:
             try:
-                query_filter = {
-                    "or": [
-                        {"property": "ISBN", "rich_text": {"equals": isbn}},
-                        {
-                            "and": [
-                                {"property": "Название", "title": {"equals": title}},
-                                {
-                                    "property": "Авторы",
-                                    "multi_select": {"contains": authors[0]},
+                if isbn:
+                    query_filter = {"property": "ISBN", "rich_text": {"equals": isbn}}
+                elif title and authors:
+                    query_filter = {
+                        "and": [
+                            {"property": "Название", "title": {"equals": title}},
+                            {
+                                "property": "Авторы",
+                                "multi_select": {
+                                    "contains": authors[0] if authors else ""
                                 },
-                            ]
-                        },
-                    ]
-                }
+                            },
+                        ]
+                    }
+                else:
+                    logger.warning(
+                        "Insufficient data to check book existence. Returning False."
+                    )
+                    return False
+
+                logger.debug(
+                    f"Checking book existence with filter: {json.dumps(query_filter, indent=2)}"
+                )
+
                 response = self.notion.databases.query(
                     database_id=self.database_id, filter=query_filter
                 )
 
                 if isinstance(response, dict) and "results" in response:
-                    return len(response["results"]) > 0
+                    exists = len(response["results"]) > 0
+                    logger.debug(
+                        f"Book existence check result: {'Exists' if exists else 'Does not exist'}"
+                    )
+                    logger.debug(
+                        f"Response from Notion API: {json.dumps(response, indent=2)}"
+                    )
+                    return exists
                 else:
                     raise TypeError(
                         f"Unexpected response type from Notion API: {response!r}"
@@ -120,74 +94,69 @@ class MissionControl:
         logger.error("Max retries reached or an error occurred. Exiting mission.")
         return False
 
-    def upload_book(self, book_data: dict[str, Any]) -> None:
+    def process_book(self, book_data: dict[str, Any]) -> bool:
         try:
             title: str = book_data.get("title", "")
             isbn: str = book_data.get("isbn", "")
             authors: list[str] = book_data.get("authors", [])
 
-            logger.info(f"Attempting to upload book: {title}")
+            logger.info(f"Processing book: {title}")
 
             if not self.check_book_existence(title, isbn, authors):
-                properties: dict[str, Any] = prepare_book_intel(book_data)
-                new_page: Any | Awaitable[Any] = self.notion.pages.create(
-                    parent={"database_id": self.database_id}, properties=properties
-                )
-
-                if isinstance(new_page, dict) and "id" in new_page:
-                    description_blocks = prepare_description_for_notion(
-                        book_data.get("description", "")
-                    )
-                    self.notion.blocks.children.append(
-                        new_page["id"], children=description_blocks
-                    )
-                    logger.info(f"Book '{title}' successfully uploaded to Notion.")
-                else:
-                    raise TypeError(
-                        f"Unexpected response type from Notion API when creating page: {type(new_page)}"
-                    )
+                self.upload_book(book_data)
+                logger.info(f"Book '{title}' successfully processed and uploaded.")
+                return True
             else:
                 logger.info(
                     f"Book '{title}' already exists in the database. Skipping upload."
                 )
+                return False
+
         except Exception as e:
             logger.exception(
-                f"Error uploading book {book_data.get('title', 'Unknown')!r}: {str(e)!r}"
+                f"Error processing book {book_data.get('title', 'Unknown')!r}: {str(e)!r}"
+            )
+            return False
+
+    def upload_book(self, book_data: dict[str, Any]) -> None:
+        properties: dict[str, Any] = prepare_book_intel(book_data)
+        new_page: Any | Awaitable[Any] = self.notion.pages.create(
+            parent={"database_id": self.database_id}, properties=properties
+        )
+
+        if isinstance(new_page, dict) and "id" in new_page:
+            description_blocks = prepare_description_for_notion(
+                book_data.get("description", "")
+            )
+            self.notion.blocks.children.append(
+                new_page["id"], children=description_blocks
+            )
+        else:
+            raise TypeError(
+                f"Unexpected response type from Notion API when creating page: {type(new_page)}"
             )
 
-    def _add_description_to_page(self, page_id: str, description: str) -> None:
-        """
-        Add the full description as content to the Notion page.
+    def process_books_from_directory(self, books_dir: str) -> tuple[int, int]:
+        books_path = Path(books_dir)
+        total_books = len(list(books_path.glob("*.json")))
+        processed_books = 0
+        uploaded_books = 0
 
-        Args:
-            page_id (str): The ID of the Notion page.
-            description (str): The full description to add.
-        """
-        if not description or not page_id:
-            return
+        for book_file in books_path.glob("*.json"):
+            processed_books += 1
+            logger.info(f"Processing file {processed_books}/{total_books}: {book_file}")
+            try:
+                with open(book_file, "r", encoding="utf-8") as f:
+                    book_data = json.load(f)
 
-        blocks = [
-            {
-                "object": "block",
-                "type": "heading_2",
-                "heading_2": {
-                    "rich_text": [
-                        {"type": "text", "text": {"content": "Полное описание"}}
-                    ]
-                },
-            },
-            {
-                "object": "block",
-                "type": "paragraph",
-                "paragraph": {
-                    "rich_text": [{"type": "text", "text": {"content": description}}]
-                },
-            },
-        ]
+                if self.process_book(book_data):
+                    uploaded_books += 1
 
-        try:
-            self.notion.blocks.children.append(page_id, children=blocks)
-        except Exception as e:
-            logger.error(
-                f"Error adding description to page {page_id}: {str(e)}", exc_info=True
-            )
+            except json.JSONDecodeError:
+                logger.error(f"Error decoding JSON from file: {book_file}")
+            except Exception as e:
+                logger.error(
+                    f"Error processing file {book_file}: {str(e)}", exc_info=True
+                )
+
+        return processed_books, uploaded_books

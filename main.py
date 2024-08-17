@@ -1,8 +1,5 @@
+import os
 import sys
-import json
-from pathlib import Path
-import traceback
-from dotenv import load_dotenv
 import argparse
 import logging
 from typing import Any
@@ -11,8 +8,29 @@ from golden_book_retriever.retriever import Retriever
 from error_handler import setup_error_handling
 from book_processor import BookProcessor
 
-# Load environment variables from .env file
-load_dotenv()
+
+def setup_logging(debug: bool = True) -> None:
+    log_level: int = logging.DEBUG if debug else logging.INFO
+
+    # Configure the root logger
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler("golden_book_retriever.log", encoding="utf-8"),
+        ],
+    )
+
+    # Set the log level for all loggers
+    for logger_name in logging.root.manager.loggerDict:
+        logger: logging.Logger = logging.getLogger(logger_name)
+        logger.setLevel(log_level)
+
+    # Ensure that the main logger is also set to the correct level
+    logger = logging.getLogger(__name__)
+    logger.setLevel(log_level)
+
 
 setup_error_handling(
     [
@@ -45,8 +63,7 @@ def main() -> None:
 
     args: argparse.Namespace = parser.parse_args()
 
-    if args.no_debug:
-        logger.setLevel(logging.INFO)
+    setup_logging(not args.no_debug)
 
     try:
         retriever = Retriever()
