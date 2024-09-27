@@ -3,10 +3,13 @@ import sys
 import argparse
 import logging
 from typing import Any
+
+from notion_client import Client
 from agent_notion.uploader import upload_books_to_notion
 from golden_book_retriever.retriever import Retriever
-from error_handler import setup_error_handling
-from book_processor import BookProcessor
+from ook_keeper.book_updater import BookUpdater
+from utils.error_handler import setup_error_handling
+from ook_keeper.book_processor import BookProcessor
 
 
 def setup_logging(debug: bool = True) -> None:
@@ -60,6 +63,9 @@ def main() -> None:
     )
     parser.add_argument("--upload", action="store_true", help="Upload books to Notion")
     parser.add_argument("--no-debug", action="store_true", help="Disable debug logging")
+    parser.add_argument(
+        "--update-books", help="JSON file containing book updates", type=str
+    )
 
     args: argparse.Namespace = parser.parse_args()
 
@@ -82,6 +88,11 @@ def main() -> None:
             processor.process_isbn(args.isbn)
         elif args.title and args.author:
             processor.process_title_author(args.title, set(args.author))
+        elif args.update_books:
+            logger.info(f"Updating books from file: {args.update_books}")
+            notion_client = Client(auth=os.environ["NOTION_SECRET"])
+            updater = BookUpdater(notion_client)
+            updater.update_books_from_file(args.update_books)
         else:
             logger.error("Invalid arguments. Use --help for usage information.")
             sys.exit(1)

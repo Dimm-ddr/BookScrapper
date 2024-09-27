@@ -1,7 +1,7 @@
 import os
 from notion_client import Client
 
-from constants import NOTION_DATABASE_ID
+from utils.constants import NOTION_DATABASE_ID
 
 
 class BookReaper:

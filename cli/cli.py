@@ -2,7 +2,7 @@ import click
 from typing import Any
 from data.datamodel import BookData
 from golden_book_retriever.retriever import Retriever
-from book_processor import BookProcessor
+from ook_keeper.book_processor import BookProcessor
 from agent_notion.uploader import upload_books_to_notion
 
 

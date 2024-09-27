@@ -8,7 +8,7 @@ import logging
 import json
 from pathlib import Path
 
-from constants import NOTION_DATABASE_ID
+from utils.constants import NOTION_DATABASE_ID
 from .field_operative import prepare_book_intel, prepare_description_for_notion
 
 logger: logging.Logger = logging.getLogger(__name__)
